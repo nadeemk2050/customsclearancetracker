@@ -12,9 +12,16 @@ import {
   FileCheck2, 
   ShieldAlert,
   Sparkles,
-  Building2
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  Clock,
+  MapPin,
+  Building2,
+  Coins
 } from 'lucide-react';
-import { addDays, formatDate } from '../utils/dateUtils';
+import { addDays, formatDate, formatCurrency } from '../utils/dateUtils';
 
 const DEFAULT_CONTAINER = {
   id: '',
@@ -81,6 +88,14 @@ const DEFAULT_SHIPMENT = {
   containers: [{ ...DEFAULT_CONTAINER, id: 'c_' + Date.now() }]
 };
 
+const TABS = [
+  { id: 'general', step: '1', label: 'Logistics & Routing', icon: Ship },
+  { id: 'freetime', step: '2', label: 'Demurrage & Free Time', icon: ShieldAlert },
+  { id: 'customs', step: '3', label: 'Customs & DO', icon: DollarSign },
+  { id: 'containers', step: '4', label: 'Containers', icon: Box },
+  { id: 'documents', step: '5', label: 'Document Checklist', icon: FileCheck2 }
+];
+
 export const ShipmentModal = ({ 
   isOpen, 
   onClose, 
@@ -89,7 +104,7 @@ export const ShipmentModal = ({
   masters = {}
 }) => {
   const [formData, setFormData] = useState(DEFAULT_SHIPMENT);
-  const [activeTab, setActiveTab] = useState('general'); // general | freetime | customs | containers | documents
+  const [activeTab, setActiveTab] = useState('general');
   const [error, setError] = useState('');
 
   const shippingLinesList = masters.shippingLines || [];
@@ -127,6 +142,8 @@ export const ShipmentModal = ({
 
   if (!isOpen) return null;
 
+  const currentTabIndex = TABS.findIndex(t => t.id === activeTab);
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -134,7 +151,7 @@ export const ShipmentModal = ({
     }));
   };
 
-  // Auto-populate when selecting a Master Shipping Line
+  // Master auto-fill when selecting carrier
   const handleShippingLineSelect = (lineName) => {
     const matched = shippingLinesList.find(l => l.name === lineName);
     setFormData(prev => ({
@@ -146,7 +163,7 @@ export const ShipmentModal = ({
     }));
   };
 
-  // Auto-populate when selecting a Master Consignee
+  // Master auto-fill when selecting consignee
   const handleConsigneeSelect = (consigneeName) => {
     const matched = consigneesList.find(c => c.name.toLowerCase() === consigneeName.toLowerCase());
     setFormData(prev => ({
@@ -156,7 +173,7 @@ export const ShipmentModal = ({
     }));
   };
 
-  // Auto-populate when selecting Master Port of Discharge
+  // Master auto-fill when selecting POD
   const handlePodSelect = (podName) => {
     const matched = portsList.find(p => p.name.toLowerCase() === podName.toLowerCase());
     setFormData(prev => ({
@@ -167,7 +184,7 @@ export const ShipmentModal = ({
     }));
   };
 
-  // Auto-populate when selecting Master Cargo Description
+  // Master auto-fill when selecting cargo
   const handleCargoSelect = (cargoDesc) => {
     const matched = cargoList.find(c => c.description.toLowerCase() === cargoDesc.toLowerCase());
     setFormData(prev => ({
@@ -221,11 +238,23 @@ export const ShipmentModal = ({
 
   const removeContainerRow = (index) => {
     if (formData.containers.length <= 1) {
-      alert('A shipment must have at least one container.');
+      alert('A shipment must contain at least one container.');
       return;
     }
     const updated = formData.containers.filter((_, i) => i !== index);
     setFormData(prev => ({ ...prev, containers: updated }));
+  };
+
+  const handleNextTab = () => {
+    if (currentTabIndex < TABS.length - 1) {
+      setActiveTab(TABS[currentTabIndex + 1].id);
+    }
+  };
+
+  const handlePrevTab = () => {
+    if (currentTabIndex > 0) {
+      setActiveTab(TABS[currentTabIndex - 1].id);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -247,72 +276,93 @@ export const ShipmentModal = ({
     onClose();
   };
 
-  // Preview calculations
+  // Live calculations
   const portExpiryPreview = formData.dischargeDate ? addDays(formData.dischargeDate, formData.portFreeDays) : '—';
   const lineExpiryPreview = formData.dischargeDate ? addDays(formData.dischargeDate, formData.lineFreeDays) : '—';
+  const verifiedDocCount = Object.values(formData.documents || {}).filter(Boolean).length;
 
   return (
     <div className="modal-overlay">
-      <div className="modal-box" style={{ maxWidth: '980px', maxHeight: '92vh' }}>
-        {/* Modal Header */}
-        <div className="modal-header bg-slate-900 text-white border-b border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-white tracking-tight">
-                {shipmentToEdit ? `Edit Shipment Dossier — ${shipmentToEdit.blNo}` : 'Create New Customs Clearance Dossier'}
-              </h2>
-              <span className="text-[11px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-400/30">
-                End-to-End Tracking
-              </span>
+      <div className="shipment-modal-container">
+        {/* Header */}
+        <div className="dossier-modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '46px',
+              height: '46px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #2563eb, #06b6d4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)'
+            }}>
+              <Ship size={24} color="#ffffff" />
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Integrated with Master Presets: auto-populates free days, HS codes, warehouses & detention rates.
-            </p>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-0.01em' }}>
+                  {shipmentToEdit ? `Edit Shipment Dossier — ${shipmentToEdit.blNo}` : 'Create New Customs Clearance Dossier'}
+                </h2>
+                <span className="brand-badge">Full Suite</span>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '3px 0 0' }}>
+                End-to-end logistics tracking, automated demurrage loss prevention, and multi-container equipment manifest.
+              </p>
+            </div>
           </div>
           <button onClick={onClose} className="btn-icon-only text-slate-400 hover:text-white">
             <X size={20} />
           </button>
         </div>
 
-        {/* Enhanced Modern Tab Navigation Bar */}
-        <div className="flex border-b border-slate-200 bg-slate-100/90 px-6 gap-2 pt-2.5 overflow-x-auto">
-          {[
-            { id: 'general', label: '1. Logistics & Routing', icon: Ship },
-            { id: 'freetime', label: '2. Demurrage & Free Time', icon: ShieldAlert },
-            { id: 'customs', label: '3. Customs & Delivery Order', icon: DollarSign },
-            { id: 'containers', label: `4. Containers (${formData.containers.length})`, icon: Box },
-            { id: 'documents', label: '5. Document Checklist', icon: FileCheck2 }
-          ].map((tab) => {
+        {/* Segmented Pill Tab Bar */}
+        <div className="dossier-tab-strip">
+          {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const labelText = tab.id === 'containers' 
+              ? `Containers (${formData.containers.length})` 
+              : tab.id === 'documents'
+              ? `Documents (${verifiedDocCount}/10)`
+              : tab.label;
+
             return (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2.5 text-xs font-bold rounded-t-lg transition flex items-center gap-2 whitespace-nowrap border-t border-l border-r ${
-                  isActive
-                    ? 'bg-white text-blue-700 border-slate-300 shadow-sm border-b-2 border-b-white -mb-[1px]'
-                    : 'bg-slate-200/60 text-slate-600 border-transparent hover:bg-slate-200 hover:text-slate-900'
-                }`}
+                className={`dossier-tab-item ${isActive ? 'active' : ''}`}
               >
-                <Icon size={14} className={isActive ? 'text-blue-600' : 'text-slate-500'} />
-                <span>{tab.label}</span>
+                <span className="dossier-step-circle">{tab.step}</span>
+                <Icon size={14} style={{ color: isActive ? '#2563eb' : '#64748b' }} />
+                <span>{labelText}</span>
               </button>
             );
           })}
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="modal-body">
+        <form onSubmit={handleSubmit} className="dossier-body-scroll">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-xs flex items-center gap-2">
+            <div style={{
+              marginBottom: '1.25rem',
+              padding: '12px 16px',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#b91c1c',
+              borderRadius: '10px',
+              fontSize: '0.825rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
               <AlertCircle size={16} />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Datalists for Instant Auto-complete from Masters */}
+          {/* Datalists for Masters Autocomplete */}
           <datalist id="master-consignees-list">
             {consigneesList.map(c => (
               <option key={c.id} value={c.name}>{c.destinationYard || c.address}</option>
@@ -343,388 +393,471 @@ export const ShipmentModal = ({
             ))}
           </datalist>
 
-          {/* TAB 1: GENERAL LOGISTICS */}
+          {/* TAB 1: LOGISTICS & ROUTING */}
           {activeTab === 'general' && (
-            <div className="form-grid">
-              <div className="form-group">
-                <label>Bill of Lading (BL) Number *</label>
-                <input
-                  required
-                  type="text"
-                  className="form-control uppercase font-mono font-bold"
-                  placeholder="e.g. HLCUTOR260620111"
-                  value={formData.blNo}
-                  onChange={(e) => handleInputChange('blNo', e.target.value.toUpperCase())}
-                />
-              </div>
-
-              <div className="form-group">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-700">Shipping Line / Carrier *</label>
-                  <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
-                    <Sparkles size={11} /> Auto-sets free days & rates
-                  </span>
+            <div>
+              {/* Card 1: Ocean Freight Identification */}
+              <div className="dossier-group-card">
+                <div className="dossier-group-title">
+                  <Ship size={16} color="#2563eb" />
+                  <span>1. Ocean Freight & Carrier Identification</span>
                 </div>
-                <select
-                  className="form-control font-semibold"
-                  value={formData.shippingLine}
-                  onChange={(e) => handleShippingLineSelect(e.target.value)}
-                >
-                  {shippingLinesList.map(l => (
-                    <option key={l.id} value={l.name}>
-                      {l.name} {l.scac ? `(${l.scac})` : ''}
-                    </option>
-                  ))}
-                  <option value="Other Line / NVOCC">Other Line / NVOCC</option>
-                </select>
-              </div>
+                <div className="dossier-grid-2">
+                  <div>
+                    <label className="dossier-field-label">
+                      <span>Bill of Lading (BL) Number *</span>
+                      <span className="dossier-helper-tag">Master or House BL</span>
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      className="dossier-input-control mono"
+                      style={{ textTransform: 'uppercase', fontWeight: 800, fontSize: '0.95rem', letterSpacing: '0.05em' }}
+                      placeholder="e.g. HLCUTOR260620111"
+                      value={formData.blNo}
+                      onChange={(e) => handleInputChange('blNo', e.target.value.toUpperCase())}
+                    />
+                  </div>
 
-              <div className="form-group">
-                <label>Vessel Name</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. AL ZUBARA"
-                  value={formData.vessel}
-                  onChange={(e) => handleInputChange('vessel', e.target.value)}
-                />
-              </div>
+                  <div>
+                    <label className="dossier-field-label">
+                      <span>Shipping Line / Carrier *</span>
+                      <span className="dossier-helper-tag">
+                        <Sparkles size={11} /> Auto-loads free days & tariff rates
+                      </span>
+                    </label>
+                    <select
+                      className="dossier-input-control"
+                      style={{ fontWeight: 700 }}
+                      value={formData.shippingLine}
+                      onChange={(e) => handleShippingLineSelect(e.target.value)}
+                    >
+                      {shippingLinesList.map(l => (
+                        <option key={l.id} value={l.name}>
+                          {l.name} {l.scac ? `(${l.scac})` : ''}
+                        </option>
+                      ))}
+                      <option value="Other Line / NVOCC">Other Line / NVOCC</option>
+                    </select>
+                  </div>
 
-              <div className="form-group">
-                <label>Voyage Number</label>
-                <input
-                  type="text"
-                  className="form-control font-mono"
-                  placeholder="e.g. 2604E"
-                  value={formData.voyage}
-                  onChange={(e) => handleInputChange('voyage', e.target.value)}
-                />
-              </div>
+                  <div>
+                    <label className="dossier-field-label">Vessel Name</label>
+                    <input
+                      type="text"
+                      className="dossier-input-control"
+                      placeholder="e.g. AL ZUBARA"
+                      value={formData.vessel}
+                      onChange={(e) => handleInputChange('vessel', e.target.value)}
+                    />
+                  </div>
 
-              <div className="form-group">
-                <label>Port of Loading (POL)</label>
-                <input
-                  type="text"
-                  list="master-ports-list"
-                  className="form-control"
-                  placeholder="Select from Master Ports or type (e.g. Hamburg, Germany)"
-                  value={formData.pol}
-                  onChange={(e) => handleInputChange('pol', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-700">Port of Discharge (POD) *</label>
-                  <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
-                    <Sparkles size={11} /> Auto-sets terminal storage
-                  </span>
+                  <div>
+                    <label className="dossier-field-label">Voyage Number</label>
+                    <input
+                      type="text"
+                      className="dossier-input-control mono"
+                      placeholder="e.g. 2604E"
+                      value={formData.voyage}
+                      onChange={(e) => handleInputChange('voyage', e.target.value)}
+                    />
+                  </div>
                 </div>
-                <input
-                  required
-                  type="text"
-                  list="master-ports-list"
-                  className="form-control font-semibold"
-                  placeholder="Select Master Port (e.g. Jebel Ali Port (AEJEA))"
-                  value={formData.pod}
-                  onChange={(e) => handlePodSelect(e.target.value)}
-                />
               </div>
 
-              <div className="form-group">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-700">Consignee (Importer) *</label>
-                  <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
-                    <Sparkles size={11} /> Auto-sets destination yard
-                  </span>
+              {/* Card 2: Ports & Inland Routing */}
+              <div className="dossier-group-card">
+                <div className="dossier-group-title">
+                  <MapPin size={16} color="#0891b2" />
+                  <span>2. Routing & Inland Delivery Destination</span>
                 </div>
-                <input
-                  required
-                  type="text"
-                  list="master-consignees-list"
-                  className="form-control font-semibold"
-                  placeholder="Select Master Consignee (e.g. MUMTAZ PLASTIC RECYCLING LLC)"
-                  value={formData.consignee}
-                  onChange={(e) => handleConsigneeSelect(e.target.value)}
-                />
-              </div>
+                <div className="dossier-grid-2">
+                  <div>
+                    <label className="dossier-field-label">Port of Loading (POL)</label>
+                    <input
+                      type="text"
+                      list="master-ports-list"
+                      className="dossier-input-control"
+                      placeholder="e.g. Hamburg Port (DEHAM)"
+                      value={formData.pol}
+                      onChange={(e) => handleInputChange('pol', e.target.value)}
+                    />
+                  </div>
 
-              <div className="form-group">
-                <label>Shipper (Exporter / Supplier)</label>
-                <input
-                  type="text"
-                  list="master-shippers-list"
-                  className="form-control"
-                  placeholder="Select Master Shipper (e.g. POLYMER GLOBAL GMBH)"
-                  value={formData.shipper}
-                  onChange={(e) => handleInputChange('shipper', e.target.value)}
-                />
-              </div>
+                  <div>
+                    <label className="dossier-field-label">
+                      <span>Port of Discharge (POD) *</span>
+                      <span className="dossier-helper-tag">
+                        <Sparkles size={11} /> Auto-sets terminal storage days
+                      </span>
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      list="master-ports-list"
+                      className="dossier-input-control"
+                      style={{ fontWeight: 700 }}
+                      placeholder="e.g. Jebel Ali Port (AEJEA)"
+                      value={formData.pod}
+                      onChange={(e) => handlePodSelect(e.target.value)}
+                    />
+                  </div>
 
-              <div className="form-group form-full">
-                <label>Final Inland Destination / Consignee Yard</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. Dubai Industrial City Yard, Warehouse 4"
-                  value={formData.finalDestination}
-                  onChange={(e) => handleInputChange('finalDestination', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group form-full">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-700">Cargo Description</label>
-                  <span className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
-                    <Sparkles size={11} /> Auto-sets HS code & packaging
-                  </span>
+                  <div className="dossier-grid-full">
+                    <label className="dossier-field-label">
+                      <span>Final Inland Delivery Destination / Consignee Yard</span>
+                      <span className="dossier-helper-tag">Warehouse address</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="dossier-input-control"
+                      placeholder="e.g. Dubai Industrial City Yard, Warehouse 4"
+                      value={formData.finalDestination}
+                      onChange={(e) => handleInputChange('finalDestination', e.target.value)}
+                    />
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  list="master-cargo-list"
-                  className="form-control"
-                  placeholder="Select Master Cargo Description or type custom..."
-                  value={formData.cargoDescription}
-                  onChange={(e) => handleCargoSelect(e.target.value)}
-                />
               </div>
 
-              <div className="form-group">
-                <label>Total Packages & Packaging Type</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. 960 Bags / 24 Pallets"
-                  value={formData.totalPackages}
-                  onChange={(e) => handleInputChange('totalPackages', e.target.value)}
-                />
+              {/* Card 3: Commercial Parties */}
+              <div className="dossier-group-card">
+                <div className="dossier-group-title">
+                  <Building2 size={16} color="#059669" />
+                  <span>3. Commercial Parties (Consignee & Shipper)</span>
+                </div>
+                <div className="dossier-grid-2">
+                  <div>
+                    <label className="dossier-field-label">
+                      <span>Consignee (Importer) *</span>
+                      <span className="dossier-helper-tag">
+                        <Sparkles size={11} /> Auto-fills yard address
+                      </span>
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      list="master-consignees-list"
+                      className="dossier-input-control"
+                      style={{ fontWeight: 700 }}
+                      placeholder="Select Master Consignee or type..."
+                      value={formData.consignee}
+                      onChange={(e) => handleConsigneeSelect(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Shipper (Exporter / Supplier)</label>
+                    <input
+                      type="text"
+                      list="master-shippers-list"
+                      className="dossier-input-control"
+                      placeholder="Select Master Shipper or type..."
+                      value={formData.shipper}
+                      onChange={(e) => handleInputChange('shipper', e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="form-group">
-                <label>Gross Weight (KG)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  placeholder="e.g. 52140"
-                  value={formData.grossWeightKg}
-                  onChange={(e) => handleInputChange('grossWeightKg', e.target.value)}
-                />
+              {/* Card 4: Cargo Specifications */}
+              <div className="dossier-group-card">
+                <div className="dossier-group-title">
+                  <Box size={16} color="#7c3aed" />
+                  <span>4. Cargo Specifications</span>
+                </div>
+                <div className="dossier-grid-2">
+                  <div className="dossier-grid-full">
+                    <label className="dossier-field-label">
+                      <span>Cargo Description</span>
+                      <span className="dossier-helper-tag">
+                        <Sparkles size={11} /> Auto-fills HS code & packaging
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      list="master-cargo-list"
+                      className="dossier-input-control"
+                      placeholder="Select from Master Cargo or type custom description..."
+                      value={formData.cargoDescription}
+                      onChange={(e) => handleCargoSelect(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Packaging & Total Packages</label>
+                    <input
+                      type="text"
+                      className="dossier-input-control"
+                      placeholder="e.g. 960 Bags / 24 Pallets"
+                      value={formData.totalPackages}
+                      onChange={(e) => handleInputChange('totalPackages', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Gross Weight (KG)</label>
+                    <input
+                      type="number"
+                      className="dossier-input-control"
+                      placeholder="e.g. 52140"
+                      value={formData.grossWeightKg}
+                      onChange={(e) => handleInputChange('grossWeightKg', e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: FREE TIME & DEMURRAGE RULES */}
+          {/* TAB 2: DEMURRAGE & FREE TIME RULES */}
           {activeTab === 'freetime' && (
-            <div className="form-grid">
-              <div className="form-full bg-blue-50 border border-blue-200 p-4 rounded-lg mb-2">
-                <h4 className="text-xs font-bold uppercase text-blue-900 tracking-wide mb-1 flex items-center gap-1.5">
-                  <ShieldAlert size={15} />
-                  Automated Dual-Clock Demurrage Prevention Rules
-                </h4>
-                <p className="text-xs text-blue-800">
-                  Pre-configured from Master Shipping Line (<strong>{formData.shippingLine}</strong>) and Master Port (<strong>{formData.pod}</strong>).
-                </p>
-              </div>
-
-              <div className="form-group">
-                <label>Estimated Arrival (ETA)</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={formData.eta}
-                  onChange={(e) => handleInputChange('eta', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Actual Arrival (ATA)</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={formData.ata}
-                  onChange={(e) => handleInputChange('ata', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Vessel Discharge Date (Clock Start Day 0) *</label>
-                <input
-                  type="date"
-                  className="form-control font-bold"
-                  value={formData.dischargeDate}
-                  onChange={(e) => handleInputChange('dischargeDate', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Delivery Order (DO) Validity Expiry Date</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={formData.doValidityDate}
-                  onChange={(e) => handleInputChange('doValidityDate', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Port Terminal Storage Free Days (Default: 5-7)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={formData.portFreeDays}
-                  onChange={(e) => handleInputChange('portFreeDays', e.target.value)}
-                />
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Calculated Port Storage Expiry: <strong>{formatDate(portExpiryPreview)}</strong>
+            <div>
+              {/* Visual Radar Calculation Box */}
+              <div className="freetime-radar-preview">
+                <div className="freetime-stat-box">
+                  <span>Discharge Date (Day 0)</span>
+                  <strong>{formatDate(formData.dischargeDate)}</strong>
+                  <small>Clocks start ticking upon vessel discharge</small>
+                </div>
+                <div className="freetime-stat-box">
+                  <span>Port Storage Expiry ({formData.portFreeDays || 5} Free Days)</span>
+                  <strong style={{ color: '#b45309' }}>{formatDate(portExpiryPreview)}</strong>
+                  <small>Terminal penalty: ${formData.portStorageDailyRate || 45}/box/day</small>
+                </div>
+                <div className="freetime-stat-box">
+                  <span>Empty Return Cutoff ({formData.lineFreeDays || 14} Free Days)</span>
+                  <strong style={{ color: '#047857' }}>{formatDate(lineExpiryPreview)}</strong>
+                  <small>Line detention: ${formData.lineDetentionDailyRate || 80}/box/day</small>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Shipping Line D&D Free Days (Default: 14-21)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={formData.lineFreeDays}
-                  onChange={(e) => handleInputChange('lineFreeDays', e.target.value)}
-                />
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Calculated Empty Return Cutoff: <strong>{formatDate(lineExpiryPreview)}</strong>
+              <div className="dossier-group-card">
+                <div className="dossier-group-title">
+                  <Calendar size={16} color="#2563eb" />
+                  <span>Vessel Milestones & Delivery Order Expiry</span>
+                </div>
+                <div className="dossier-grid-2">
+                  <div>
+                    <label className="dossier-field-label">Estimated Time of Arrival (ETA)</label>
+                    <input
+                      type="date"
+                      className="dossier-input-control"
+                      value={formData.eta}
+                      onChange={(e) => handleInputChange('eta', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Actual Time of Arrival (ATA)</label>
+                    <input
+                      type="date"
+                      className="dossier-input-control"
+                      value={formData.ata}
+                      onChange={(e) => handleInputChange('ata', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">
+                      <span>Vessel Discharge Date (Clock Start Day 0) *</span>
+                      <span className="dossier-helper-tag">Crucial milestone</span>
+                    </label>
+                    <input
+                      required
+                      type="date"
+                      className="dossier-input-control font-bold"
+                      value={formData.dischargeDate}
+                      onChange={(e) => handleInputChange('dischargeDate', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">
+                      <span>Delivery Order (DO) Validity Expiry Date</span>
+                      <span className="dossier-helper-tag">Watch for expiry</span>
+                    </label>
+                    <input
+                      type="date"
+                      className="dossier-input-control"
+                      value={formData.doValidityDate}
+                      onChange={(e) => handleInputChange('doValidityDate', e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Daily Port Storage Rate ($/Container/Day)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={formData.portStorageDailyRate}
-                  onChange={(e) => handleInputChange('portStorageDailyRate', e.target.value)}
-                />
-              </div>
+              <div className="dossier-group-card">
+                <div className="dossier-group-title">
+                  <ShieldAlert size={16} color="#d97706" />
+                  <span>Tariff Rules & Daily Penalty Slabs</span>
+                </div>
+                <div className="dossier-grid-2">
+                  <div>
+                    <label className="dossier-field-label">Port Terminal Free Storage Days</label>
+                    <input
+                      type="number"
+                      className="dossier-input-control"
+                      value={formData.portFreeDays}
+                      onChange={(e) => handleInputChange('portFreeDays', e.target.value)}
+                    />
+                  </div>
 
-              <div className="form-group">
-                <label>Daily Line Detention Rate ($/Container/Day)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={formData.lineDetentionDailyRate}
-                  onChange={(e) => handleInputChange('lineDetentionDailyRate', e.target.value)}
-                />
+                  <div>
+                    <label className="dossier-field-label">Daily Port Storage Rate ($/box/day)</label>
+                    <input
+                      type="number"
+                      className="dossier-input-control"
+                      value={formData.portStorageDailyRate}
+                      onChange={(e) => handleInputChange('portStorageDailyRate', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Shipping Line Demurrage & Detention Free Days</label>
+                    <input
+                      type="number"
+                      className="dossier-input-control"
+                      value={formData.lineFreeDays}
+                      onChange={(e) => handleInputChange('lineFreeDays', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Daily Line Detention Rate ($/box/day)</label>
+                    <input
+                      type="number"
+                      className="dossier-input-control"
+                      value={formData.lineDetentionDailyRate}
+                      onChange={(e) => handleInputChange('lineDetentionDailyRate', e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {/* TAB 3: CUSTOMS & DELIVERY ORDER */}
           {activeTab === 'customs' && (
-            <div className="form-grid">
-              <div className="form-group">
-                <label>Current Customs Clearance Stage</label>
-                <select
-                  className="form-control font-bold"
-                  value={formData.customsStatus}
-                  onChange={(e) => handleInputChange('customsStatus', e.target.value)}
-                >
-                  <option value="Pre-Arrival">Pre-Arrival</option>
-                  <option value="DO Taken">DO Taken / Issued</option>
-                  <option value="Declaration Filed">Customs Declaration Filed</option>
-                  <option value="Under Inspection">Under Inspection / Lab Test</option>
-                  <option value="Duty Paid">Duty Paid</option>
-                  <option value="Customs Cleared">Customs Cleared (OOC)</option>
-                  <option value="Gate Out">Gate Out / Dispatched</option>
-                  <option value="Delivered">Delivered at Consignee</option>
-                  <option value="Empties Returned">Empties Returned (Closed)</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Inspection / Regulatory Routing Channel</label>
-                <select
-                  className="form-control"
-                  value={formData.inspectionType}
-                  onChange={(e) => handleInputChange('inspectionType', e.target.value)}
-                >
-                  <option value="None">None (Standard)</option>
-                  <option value="Green Channel (Direct Release)">Green Channel (Direct Document Release)</option>
-                  <option value="Yellow (Assessment / Document Audit)">Yellow Channel (Documentary Audit)</option>
-                  <option value="Red (Physical & Customs Lab Sampling)">Red Channel (Physical Exam & Scanner)</option>
-                  <option value="Ministry / Food / Health Approval">Special Agency (Food / Health / Municipality)</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Customs Declaration / BOE Number</label>
-                <input
-                  type="text"
-                  className="form-control font-mono"
-                  placeholder="e.g. DXB-CUST-883921"
-                  value={formData.customsDeclarationNo}
-                  onChange={(e) => handleInputChange('customsDeclarationNo', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Declaration Filing Date</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={formData.customsDeclarationDate}
-                  onChange={(e) => handleInputChange('customsDeclarationDate', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Harmonized System (HS) Code</label>
-                <input
-                  type="text"
-                  className="form-control font-mono"
-                  placeholder="e.g. 3902.10.00"
-                  value={formData.hsCode}
-                  onChange={(e) => handleInputChange('hsCode', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Assessed Customs Duty ($)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  placeholder="e.g. 2607"
-                  value={formData.customsDutyAmount}
-                  onChange={(e) => handleInputChange('customsDutyAmount', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Assessed VAT / Tax ($)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  placeholder="e.g. 2737"
-                  value={formData.customsVatAmount}
-                  onChange={(e) => handleInputChange('customsVatAmount', e.target.value)}
-                />
-              </div>
-
-              {/* Security Deposit Section */}
-              <div className="form-full border-t pt-4 mt-2">
-                <h4 className="text-xs font-bold uppercase text-slate-700 tracking-wider mb-3">
-                  Shipping Line Container Security Deposit Tracking
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <div className="dossier-group-card">
+                <div className="dossier-group-title">
+                  <DollarSign size={16} color="#2563eb" />
+                  <span>Customs Declaration Assessment & Channel Routing</span>
+                </div>
+                <div className="dossier-grid-2">
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1">Deposit Amount ($)</label>
+                    <label className="dossier-field-label">Current Customs Clearance Milestone</label>
+                    <select
+                      className="dossier-input-control font-bold"
+                      value={formData.customsStatus}
+                      onChange={(e) => handleInputChange('customsStatus', e.target.value)}
+                    >
+                      <option value="Pre-Arrival">Pre-Arrival</option>
+                      <option value="DO Taken">DO Taken / Issued</option>
+                      <option value="Declaration Filed">Customs Declaration Filed</option>
+                      <option value="Under Inspection">Under Inspection / Lab Test</option>
+                      <option value="Duty Paid">Duty Paid</option>
+                      <option value="Customs Cleared">Customs Cleared (OOC)</option>
+                      <option value="Gate Out">Gate Out / Dispatched</option>
+                      <option value="Delivered">Delivered at Consignee</option>
+                      <option value="Empties Returned">Empties Returned (Closed)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Inspection / Regulatory Channel</label>
+                    <select
+                      className="dossier-input-control"
+                      value={formData.inspectionType}
+                      onChange={(e) => handleInputChange('inspectionType', e.target.value)}
+                    >
+                      <option value="None">None (Standard)</option>
+                      <option value="Green Channel (Direct Release)">Green Channel (Direct Document Release)</option>
+                      <option value="Yellow (Assessment / Document Audit)">Yellow Channel (Documentary Audit)</option>
+                      <option value="Red (Physical & Customs Lab Sampling)">Red Channel (Physical Exam & Scanner)</option>
+                      <option value="Ministry / Food / Health Approval">Special Agency (Food / Health / Municipality)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Customs Declaration (Bill of Entry) Number</label>
+                    <input
+                      type="text"
+                      className="dossier-input-control mono"
+                      placeholder="e.g. DXB-CUST-883921"
+                      value={formData.customsDeclarationNo}
+                      onChange={(e) => handleInputChange('customsDeclarationNo', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Declaration Filing Date</label>
+                    <input
+                      type="date"
+                      className="dossier-input-control"
+                      value={formData.customsDeclarationDate}
+                      onChange={(e) => handleInputChange('customsDeclarationDate', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="dossier-field-label">Harmonized Tariff (HS) Code</label>
+                    <input
+                      type="text"
+                      className="dossier-input-control mono font-bold"
+                      placeholder="e.g. 3902.10.00"
+                      value={formData.hsCode}
+                      onChange={(e) => handleInputChange('hsCode', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="dossier-grid-2">
+                    <div>
+                      <label className="dossier-field-label">Customs Duty ($)</label>
+                      <input
+                        type="number"
+                        className="dossier-input-control"
+                        placeholder="e.g. 2607"
+                        value={formData.customsDutyAmount}
+                        onChange={(e) => handleInputChange('customsDutyAmount', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="dossier-field-label">VAT / Tax ($)</label>
+                      <input
+                        type="number"
+                        className="dossier-input-control"
+                        placeholder="e.g. 2737"
+                        value={formData.customsVatAmount}
+                        onChange={(e) => handleInputChange('customsVatAmount', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Shipping Line Security Deposit Guarantee */}
+              <div className="dossier-group-card">
+                <div className="dossier-group-title">
+                  <Coins size={16} color="#059669" />
+                  <span>Shipping Line Container Security Deposit Tracking</span>
+                </div>
+                <div className="dossier-grid-3">
+                  <div>
+                    <label className="dossier-field-label">Security Deposit Amount ($)</label>
                     <input
                       type="number"
-                      className="form-control"
+                      className="dossier-input-control"
                       placeholder="e.g. 2000"
                       value={formData.doSecurityDeposit.amount}
                       onChange={(e) => handleDepositChange('amount', e.target.value)}
                     />
                   </div>
+
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1">Deposit Status</label>
+                    <label className="dossier-field-label">Deposit Refund Status</label>
                     <select
-                      className="form-control font-medium"
+                      className="dossier-input-control font-bold"
                       value={formData.doSecurityDeposit.status}
                       onChange={(e) => handleDepositChange('status', e.target.value)}
                     >
@@ -734,11 +867,12 @@ export const ShipmentModal = ({
                       <option value="Refunded">Refund Received</option>
                     </select>
                   </div>
+
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1">Deposit Receipt / Guarantee Ref</label>
+                    <label className="dossier-field-label">Guarantee / Receipt Ref #</label>
                     <input
                       type="text"
-                      className="form-control font-mono"
+                      className="dossier-input-control mono"
                       placeholder="e.g. HL-DEP-99410"
                       value={formData.doSecurityDeposit.receiptNo}
                       onChange={(e) => handleDepositChange('receiptNo', e.target.value)}
@@ -747,12 +881,13 @@ export const ShipmentModal = ({
                 </div>
               </div>
 
-              <div className="form-group form-full">
-                <label>Operational Notes & Special Instructions</label>
+              {/* Operational Remarks */}
+              <div className="dossier-group-card">
+                <label className="dossier-field-label">Operational Notes & Clearing Instructions</label>
                 <textarea
                   rows={2}
-                  className="form-control"
-                  placeholder="Inspection notes, customs inspector remarks, trucker booking details..."
+                  className="dossier-input-control"
+                  placeholder="Inspector instructions, sampling laboratory remarks, truck token slots..."
                   value={formData.notes}
                   onChange={(e) => handleInputChange('notes', e.target.value)}
                 />
@@ -760,16 +895,16 @@ export const ShipmentModal = ({
             </div>
           )}
 
-          {/* TAB 4: MULTI-CONTAINER REPEATER */}
+          {/* TAB 4: CONTAINERS REPEATER */}
           {activeTab === 'containers' && (
             <div>
-              <div className="flex items-center justify-between mb-4">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                     Container Equipment Manifest ({formData.containers.length} Units)
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    Track discharge, port gate-out, consignee offload, and empty return EIR per container.
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
+                    Track individual container discharge, gate-out, delivery, and depot EIR return dates.
                   </p>
                 </div>
                 <button
@@ -777,190 +912,238 @@ export const ShipmentModal = ({
                   onClick={addContainerRow}
                   className="btn btn-primary btn-sm"
                 >
-                  <Plus size={14} />
-                  <span>Add Container</span>
+                  <Plus size={15} />
+                  <span>Add Container Box</span>
                 </button>
               </div>
 
-              <div className="space-y-3">
-                {formData.containers.map((cont, index) => (
-                  <div key={cont.id || index} className="p-3 bg-slate-50 border border-slate-200 rounded-lg relative">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-slate-700">Container #{index + 1}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeContainerRow(index)}
-                        className="text-slate-400 hover:text-red-600 transition"
-                        title="Delete container"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+              {formData.containers.map((cont, index) => (
+                <div key={cont.id || index} className="container-repeater-card">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="brand-badge" style={{ background: '#dbeafe', color: '#1e40af', borderColor: '#93c5fd' }}>
+                        Unit #{index + 1}
+                      </span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', color: '#0f172a' }}>
+                        {cont.containerNo || 'Pending Container #'}
+                      </strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeContainerRow(index)}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                      title="Delete Container Unit"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  <div className="dossier-grid-4">
+                    <div>
+                      <label className="dossier-field-label">Container Number *</label>
+                      <input
+                        required
+                        type="text"
+                        className="dossier-input-control mono font-bold uppercase"
+                        placeholder="e.g. FSCU8083274"
+                        value={cont.containerNo}
+                        onChange={(e) => handleContainerChange(index, 'containerNo', e.target.value.toUpperCase())}
+                      />
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Container No *</label>
-                        <input
-                          required
-                          type="text"
-                          className="form-control uppercase font-mono font-bold"
-                          placeholder="e.g. FSCU8083274"
-                          value={cont.containerNo}
-                          onChange={(e) => handleContainerChange(index, 'containerNo', e.target.value.toUpperCase())}
-                        />
-                      </div>
+                    <div>
+                      <label className="dossier-field-label">Size / ISO Type</label>
+                      <select
+                        className="dossier-input-control font-semibold"
+                        value={cont.sizeType}
+                        onChange={(e) => handleContainerChange(index, 'sizeType', e.target.value)}
+                      >
+                        <option value="20GP">20' General Purpose</option>
+                        <option value="40GP">40' General Purpose</option>
+                        <option value="40HC">40' High Cube</option>
+                        <option value="45HC">45' High Cube</option>
+                        <option value="20RF">20' Reefer</option>
+                        <option value="40RF">40' Reefer</option>
+                        <option value="20OT">20' Open Top</option>
+                        <option value="40OT">40' Open Top</option>
+                        <option value="40FR">40' Flat Rack</option>
+                      </select>
+                    </div>
 
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Size / Type</label>
-                        <select
-                          className="form-control"
-                          value={cont.sizeType}
-                          onChange={(e) => handleContainerChange(index, 'sizeType', e.target.value)}
-                        >
-                          <option value="20GP">20' General Purpose</option>
-                          <option value="40GP">40' General Purpose</option>
-                          <option value="40HC">40' High Cube</option>
-                          <option value="45HC">45' High Cube</option>
-                          <option value="20RF">20' Reefer</option>
-                          <option value="40RF">40' Reefer</option>
-                          <option value="20OT">20' Open Top</option>
-                          <option value="40OT">40' Open Top</option>
-                          <option value="40FR">40' Flat Rack</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label className="dossier-field-label">Seal Number</label>
+                      <input
+                        type="text"
+                        className="dossier-input-control mono"
+                        placeholder="e.g. HL773192"
+                        value={cont.sealNo}
+                        onChange={(e) => handleContainerChange(index, 'sealNo', e.target.value)}
+                      />
+                    </div>
 
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Seal Number</label>
-                        <input
-                          type="text"
-                          className="form-control font-mono"
-                          placeholder="e.g. HL773192"
-                          value={cont.sealNo}
-                          onChange={(e) => handleContainerChange(index, 'sealNo', e.target.value)}
-                        />
-                      </div>
+                    <div>
+                      <label className="dossier-field-label">Current Unit Status</label>
+                      <select
+                        className="dossier-input-control font-bold"
+                        value={cont.status}
+                        onChange={(e) => handleContainerChange(index, 'status', e.target.value)}
+                      >
+                        <option value="At Port (Full)">At Port (Full)</option>
+                        <option value="Gate Out (In Transit)">Gate Out (In Transit)</option>
+                        <option value="At Consignee (Unloading)">At Consignee (Unloading)</option>
+                        <option value="Empty Returned (Safe)">Empty Returned (Safe)</option>
+                      </select>
+                    </div>
 
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Status</label>
-                        <select
-                          className="form-control"
-                          value={cont.status}
-                          onChange={(e) => handleContainerChange(index, 'status', e.target.value)}
-                        >
-                          <option value="At Port (Full)">At Port (Full)</option>
-                          <option value="Gate Out (In Transit)">Gate Out (In Transit)</option>
-                          <option value="At Consignee (Unloading)">At Consignee (Unloading)</option>
-                          <option value="Empty Returned (Safe)">Empty Returned (Safe)</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label className="dossier-field-label">Port Gate-Out Date</label>
+                      <input
+                        type="date"
+                        className="dossier-input-control"
+                        value={cont.gateOutDate}
+                        onChange={(e) => handleContainerChange(index, 'gateOutDate', e.target.value)}
+                      />
+                    </div>
 
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Port Gate-Out Date</label>
-                        <input
-                          type="date"
-                          className="form-control"
-                          value={cont.gateOutDate}
-                          onChange={(e) => handleContainerChange(index, 'gateOutDate', e.target.value)}
-                        />
-                      </div>
+                    <div>
+                      <label className="dossier-field-label">Empty Return Depot</label>
+                      <input
+                        type="text"
+                        list="master-depots-list"
+                        className="dossier-input-control"
+                        placeholder="Select Master Depot or type..."
+                        value={cont.emptyReturnDepot}
+                        onChange={(e) => handleContainerChange(index, 'emptyReturnDepot', e.target.value)}
+                      />
+                    </div>
 
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Empty Return Depot</label>
-                        <input
-                          type="text"
-                          list="master-depots-list"
-                          className="form-control"
-                          placeholder="Select Master Depot or type..."
-                          value={cont.emptyReturnDepot}
-                          onChange={(e) => handleContainerChange(index, 'emptyReturnDepot', e.target.value)}
-                        />
-                      </div>
+                    <div>
+                      <label className="dossier-field-label">Empty Return Date</label>
+                      <input
+                        type="date"
+                        className="dossier-input-control font-bold"
+                        style={{ color: '#047857' }}
+                        value={cont.emptyReturnDate}
+                        onChange={(e) => handleContainerChange(index, 'emptyReturnDate', e.target.value)}
+                      />
+                    </div>
 
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Empty Return Date</label>
-                        <input
-                          type="date"
-                          className="form-control font-semibold text-emerald-800"
-                          value={cont.emptyReturnDate}
-                          onChange={(e) => handleContainerChange(index, 'emptyReturnDate', e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">EIR Receipt No</label>
-                        <input
-                          type="text"
-                          className="form-control font-mono"
-                          placeholder="e.g. EIR-881923"
-                          value={cont.eirNumber}
-                          onChange={(e) => handleContainerChange(index, 'eirNumber', e.target.value)}
-                        />
-                      </div>
+                    <div>
+                      <label className="dossier-field-label">EIR Receipt #</label>
+                      <input
+                        type="text"
+                        className="dossier-input-control mono font-bold"
+                        placeholder="e.g. EIR-881923"
+                        value={cont.eirNumber}
+                        onChange={(e) => handleContainerChange(index, 'eirNumber', e.target.value)}
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* TAB 5: DOCUMENT CHECKLIST */}
+          {/* TAB 5: DOCUMENT AUDIT CHECKLIST */}
           {activeTab === 'documents' && (
             <div>
-              <div className="mb-4">
-                <h3 className="text-sm font-bold text-slate-800">Customs Clearance Document Audit Checklist</h3>
-                <p className="text-xs text-slate-500">
-                  Ensure all commercial and shipping documents are obtained to prevent regulatory delays.
-                </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Customs Clearance Document Audit Checklist
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
+                    Verify trade documents to avoid regulatory holds and clearance bottlenecks.
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.825rem', fontWeight: 800, color: '#2563eb' }}>
+                    {verifiedDocCount} of 10 Verified ({verifiedDocCount * 10}%)
+                  </span>
+                  <div style={{ width: '130px', height: '6px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginTop: '4px' }}>
+                    <div style={{ width: `${verifiedDocCount * 10}%`, height: '100%', background: '#059669', transition: 'width 250ms ease' }}></div>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="checklist-tiles-grid">
                 {[
-                  { key: 'commercialInvoice', label: 'Commercial Invoice (Attested / Signed)' },
-                  { key: 'packingList', label: 'Packing List (Itemized with Gross/Net Weight)' },
+                  { key: 'commercialInvoice', label: 'Commercial Invoice (Attested & Signed)' },
+                  { key: 'packingList', label: 'Packing List (Itemized Net/Gross Weight)' },
                   { key: 'originalBL', label: 'Original Bill of Lading (or Seaway / Telex Release)' },
-                  { key: 'certificateOfOrigin', label: 'Certificate of Origin (COO / Chamber of Commerce)' },
-                  { key: 'formEFTA', label: 'FTA / Preferential Duty Exemption (Form E, etc.)' },
+                  { key: 'certificateOfOrigin', label: 'Certificate of Origin (Chamber Legalized)' },
+                  { key: 'formEFTA', label: 'Preferential Tariff Exemption (Form E / FTA)' },
                   { key: 'deliveryOrder', label: 'Shipping Line Delivery Order (DO) Issued' },
                   { key: 'customsDeclaration', label: 'Bill of Entry / Customs Declaration Draft' },
-                  { key: 'dutyPaymentReceipt', label: 'Customs Duty & Tax Payment Receipt' },
-                  { key: 'portGatePass', label: 'Port Terminal Handling (THC) & Gate Pass' },
-                  { key: 'emptyReturnEIR', label: 'Equipment Interchange Receipt (Empty Return Proof)' }
-                ].map(({ key, label }) => (
-                  <label
-                    key={key}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${
-                      formData.documents[key] ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 text-emerald-600 rounded"
-                      checked={!!formData.documents[key]}
-                      onChange={() => handleDocumentToggle(key)}
-                    />
-                    <span className="text-xs font-semibold">{label}</span>
-                  </label>
-                ))}
+                  { key: 'dutyPaymentReceipt', label: 'Customs Duty & VAT Payment Receipt' },
+                  { key: 'portGatePass', label: 'Port THC & Gate Pass Token Booked' },
+                  { key: 'emptyReturnEIR', label: 'Empty Return EIR Receipt from Depot' }
+                ].map(({ key, label }) => {
+                  const isChecked = !!formData.documents[key];
+
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => handleDocumentToggle(key)}
+                      className={`checklist-tile ${isChecked ? 'checked' : ''}`}
+                    >
+                      <div className="checklist-checkbox-circle">
+                        {isChecked && <Check size={13} strokeWidth={3} />}
+                      </div>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: isChecked ? 700 : 500 }}>
+                        {label}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Modal Footer */}
-          <div className="modal-footer mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-outline"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-            >
-              <Save size={16} />
-              <span>Save Shipment Dossier</span>
-            </button>
+          {/* Modal Bottom Footer Navigation */}
+          <div className="dossier-footer-nav" style={{ marginTop: '2rem' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn btn-outline"
+              >
+                Cancel
+              </button>
+              {currentTabIndex > 0 && (
+                <button
+                  type="button"
+                  onClick={handlePrevTab}
+                  className="btn btn-outline"
+                >
+                  <ArrowLeft size={15} />
+                  <span>Previous</span>
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {currentTabIndex < TABS.length - 1 && (
+                <button
+                  type="button"
+                  onClick={handleNextTab}
+                  className="btn btn-outline"
+                  style={{ borderColor: '#cbd5e1' }}
+                >
+                  <span>Next Step</span>
+                  <ArrowRight size={15} />
+                </button>
+              )}
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ padding: '10px 22px' }}
+              >
+                <Save size={16} />
+                <span>Save Shipment Dossier</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
