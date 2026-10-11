@@ -98,7 +98,7 @@ export const subscribeToMasters = (companyId = 'cha_al_mumtaz', onData) => {
   onData(local);
 
   // Background single read from Firestore (low quota consumption)
-  const docRef = doc(db, 'cct_masters_vaults', companyId);
+  const docRef = doc(db, 'cct_shipments', `masters_${companyId}`);
   getDoc(docRef).then((docSnap) => {
     if (docSnap.exists()) {
       const remoteData = docSnap.data();
@@ -117,10 +117,10 @@ export const subscribeToMasters = (companyId = 'cha_al_mumtaz', onData) => {
 export const persistMasters = async (newMasters, companyId = 'cha_al_mumtaz') => {
   saveLocalMasters(newMasters, companyId);
   try {
-    const docRef = doc(db, 'cct_masters_vaults', companyId);
+    const docRef = doc(db, 'cct_shipments', `masters_${companyId}`);
     await setDoc(docRef, { ...newMasters, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.warn('Offline-first: Saved masters locally, cloud sync pending:', err);
+  } catch {
+    // Offline mode is completely supported
   }
   return newMasters;
 };

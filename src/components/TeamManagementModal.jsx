@@ -42,12 +42,12 @@ export const TeamManagementModal = ({ isOpen, onClose, currentSession }) => {
   // Load team members whenever modal opens
   useEffect(() => {
     if (isOpen && companyId) {
-      const list = getCompanyTeamMembers(companyId);
+      const list = getCompanyTeamMembers(companyId, companyName);
       setTeamMembers(list);
       setEditingId(null);
       resetForm();
     }
-  }, [isOpen, companyId]);
+  }, [isOpen, companyId, companyName]);
 
   const resetForm = () => {
     setFormData({
@@ -101,6 +101,7 @@ export const TeamManagementModal = ({ isOpen, onClose, currentSession }) => {
     try {
       const memberToSave = {
         ...formData,
+        companyName,
         id: editingId || undefined
       };
       const updated = await saveCompanyTeamMember(companyId, memberToSave);
@@ -116,9 +117,14 @@ export const TeamManagementModal = ({ isOpen, onClose, currentSession }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop" style={{ zIndex: 1200 }}>
+    <div 
+      className="modal-overlay" 
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div 
-        className="modal-container"
+        className="modal-box"
         style={{ 
           maxWidth: '850px', 
           width: '95%', 
@@ -128,7 +134,7 @@ export const TeamManagementModal = ({ isOpen, onClose, currentSession }) => {
           background: '#ffffff',
           borderRadius: '16px',
           overflow: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.5)'
         }}
       >
         {/* Modal Header */}

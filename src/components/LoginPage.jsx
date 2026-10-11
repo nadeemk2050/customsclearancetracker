@@ -12,19 +12,29 @@ import {
   AlertCircle, 
   CheckCircle,
   KeyRound,
-  ShieldAlert
+  ShieldAlert,
+  Mail
 } from 'lucide-react';
-import { signUpCompanyAdmin, loginCompanyAdmin, loginTeamMember, getLocalCompanies } from '../services/authService';
+import { 
+  signUpCompanyAdmin, 
+  loginCompanyAdmin, 
+  loginTeamMember, 
+  getLocalCompanies,
+  refreshCompaniesFromCloud,
+  subscribeCloudCompanies 
+} from '../services/authService';
 
 export const LoginPage = ({ onLoginSuccess }) => {
   const [activeTab, setActiveTab] = useState('adminLogin'); // adminLogin | adminSignup | teamLogin
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [companies, setCompanies] = useState(() => getLocalCompanies());
 
   // Admin Sign Up Form State
   const [signUpData, setSignUpData] = useState({
     companyName: '',
     username: '',
+    email: '',
     password: '',
     phone: '',
     country: 'United Arab Emirates'
@@ -43,7 +53,20 @@ export const LoginPage = ({ onLoginSuccess }) => {
     password: ''
   });
 
-  const companies = getLocalCompanies();
+  // Auto-refresh registered companies on mount and listen in real-time
+  React.useEffect(() => {
+    refreshCompaniesFromCloud().then(updated => {
+      if (updated && updated.length > 0) setCompanies(updated);
+    }).catch(() => {});
+
+    const unsubscribe = subscribeCloudCompanies((updated) => {
+      if (updated && updated.length > 0) setCompanies(updated);
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   const handleAdminSignUpSubmit = async (e) => {
     e.preventDefault();
@@ -103,6 +126,14 @@ export const LoginPage = ({ onLoginSuccess }) => {
       password: '123'
     });
     setActiveTab('teamLogin');
+  };
+
+  const handleQuickDemoDeveloper = () => {
+    setAdminLoginData({
+      usernameOrCompany: 'nadeemalsaham@gmail.com',
+      password: '123'
+    });
+    setActiveTab('adminLogin');
   };
 
   return (
@@ -222,6 +253,22 @@ export const LoginPage = ({ onLoginSuccess }) => {
               >
                 Demo Team (tariq / 123)
               </button>
+              <button
+                type="button"
+                onClick={handleQuickDemoDeveloper}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(239, 68, 68, 0.25))',
+                  border: '1px solid #f59e0b',
+                  color: '#fbbf24',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  fontWeight: 800
+                }}
+              >
+                ⚡ Developer Powers (nadeemalsaham@gmail.com)
+              </button>
             </div>
           </div>
         </div>
@@ -329,7 +376,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
               </div>
 
               <div>
-                <label className="dossier-field-label">CHA Company Name or Admin Username *</label>
+                <label className="dossier-field-label">CHA Company Name, Admin Username, or Official Email *</label>
                 <div style={{ position: 'relative' }}>
                   <Building2 size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                   <input
@@ -337,7 +384,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
                     type="text"
                     className="dossier-input-control"
                     style={{ paddingLeft: '38px' }}
-                    placeholder="e.g. AL MUMTAZ CUSTOMS or admin"
+                    placeholder="e.g. admin@almumtaz.ae, falcon_admin, or AL MUMTAZ"
                     value={adminLoginData.usernameOrCompany}
                     onChange={(e) => setAdminLoginData({ ...adminLoginData, usernameOrCompany: e.target.value })}
                   />
@@ -413,7 +460,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
                   />
                 </div>
                 <div>
-                  <label className="dossier-field-label">Admin Password *</label>
+                  <label className="dossier-field-label">Admin Master Password *</label>
                   <input
                     required
                     type="password"
@@ -421,6 +468,21 @@ export const LoginPage = ({ onLoginSuccess }) => {
                     placeholder="Create secure password"
                     value={signUpData.password}
                     onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="dossier-field-label">Official Business Email Address</label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <input
+                    type="email"
+                    className="dossier-input-control"
+                    style={{ paddingLeft: '38px' }}
+                    placeholder="e.g. admin@falconcargo.com or operations@mumtaz.ae"
+                    value={signUpData.email}
+                    onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
                   />
                 </div>
               </div>
@@ -461,75 +523,168 @@ export const LoginPage = ({ onLoginSuccess }) => {
           )}
 
           {/* 3. TEAM MEMBER LOGIN */}
-          {activeTab === 'teamLogin' && (
-            <form onSubmit={handleTeamLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Assigned Team Member Login
-                </h3>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0' }}>
-                  Log in with your assigned team username. Administrator master password is also accepted!
-                </p>
-              </div>
+          {activeTab === 'teamLogin' && (() => {
+            const selectedCompanyObj = companies.find(c => {
+              const raw = (teamLoginData.companyNameOrId || '').trim().toLowerCase();
+              const clean = raw.replace(/[^a-z0-9]/g, '');
+              if (!clean) return false;
+              const cName = String(c.companyName || '').toLowerCase();
+              const cId = String(c.companyId || '').toLowerCase();
+              return cName === raw || cId === raw || cName.replace(/[^a-z0-9]/g, '') === clean;
+            });
 
-              <div>
-                <label className="dossier-field-label">CHA Company Name or ID (Optional)</label>
-                <div style={{ position: 'relative' }}>
-                  <Building2 size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                  <input
-                    type="text"
-                    className="dossier-input-control"
-                    style={{ paddingLeft: '38px' }}
-                    placeholder="e.g. AL MUMTAZ CUSTOMS (or leave blank to search)"
-                    value={teamLoginData.companyNameOrId}
-                    onChange={(e) => setTeamLoginData({ ...teamLoginData, companyNameOrId: e.target.value })}
-                  />
+            // Gather all team members across all companies if auto-detect
+            const allMembers = [];
+            companies.forEach(c => {
+              (c.teamMembers || []).forEach(m => {
+                allMembers.push({ ...m, compName: c.companyName });
+              });
+            });
+
+            return (
+              <form onSubmit={handleTeamLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Assigned Team Member Login
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0' }}>
+                    Log in with your assigned team username. Administrator master password is also accepted!
+                  </p>
                 </div>
-              </div>
 
-              <div>
-                <label className="dossier-field-label">Team Member Username *</label>
-                <div style={{ position: 'relative' }}>
-                  <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                  <input
-                    required
-                    type="text"
-                    className="dossier-input-control"
-                    style={{ paddingLeft: '38px' }}
-                    placeholder="e.g. tariq or suresh"
-                    value={teamLoginData.username}
-                    onChange={(e) => setTeamLoginData({ ...teamLoginData, username: e.target.value })}
-                  />
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label className="dossier-field-label" style={{ margin: 0 }}>CHA Company</label>
+                    <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 700 }}>
+                      ⚡ Auto-detection enabled
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {/* Dropdown for registered companies */}
+                    <select
+                      className="dossier-input-control"
+                      value={teamLoginData.companyNameOrId}
+                      onChange={(e) => setTeamLoginData({ ...teamLoginData, companyNameOrId: e.target.value })}
+                      style={{ fontWeight: 600, color: teamLoginData.companyNameOrId ? '#0f172a' : '#64748b' }}
+                    >
+                      <option value="">✨ Auto-Detect Company (Leave Blank)</option>
+                      {companies.map((c) => (
+                        <option key={c.companyId} value={c.companyName}>
+                          🏢 {c.companyName} {c.teamMembers?.length ? `(${c.teamMembers.length} staff)` : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Or free-form input */}
+                    <div style={{ position: 'relative' }}>
+                      <Building2 size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                      <input
+                        type="text"
+                        className="dossier-input-control"
+                        style={{ paddingLeft: '38px', fontSize: '0.8rem' }}
+                        placeholder="Or type company name here (case-insensitive)"
+                        value={teamLoginData.companyNameOrId}
+                        onChange={(e) => setTeamLoginData({ ...teamLoginData, companyNameOrId: e.target.value })}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="dossier-field-label">Password * (Team or Admin Master Password)</label>
-                <div style={{ position: 'relative' }}>
-                  <KeyRound size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                  <input
-                    required
-                    type="password"
-                    className="dossier-input-control"
-                    style={{ paddingLeft: '38px' }}
-                    placeholder="Enter assigned password or admin password"
-                    value={teamLoginData.password}
-                    onChange={(e) => setTeamLoginData({ ...teamLoginData, password: e.target.value })}
-                  />
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label className="dossier-field-label" style={{ margin: 0 }}>Team Member Username *</label>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Case-insensitive</span>
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input
+                      required
+                      type="text"
+                      className="dossier-input-control"
+                      style={{ paddingLeft: '38px' }}
+                      placeholder="e.g. nadeem or tariq"
+                      value={teamLoginData.username}
+                      onChange={(e) => setTeamLoginData({ ...teamLoginData, username: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Quick-fill pills for assigned team members */}
+                  {(selectedCompanyObj ? selectedCompanyObj.teamMembers : allMembers)?.length > 0 && (
+                    <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Quick Pick:</span>
+                      {(selectedCompanyObj ? selectedCompanyObj.teamMembers : allMembers.slice(0, 5)).map((m) => (
+                        <button
+                          key={m.id || m.username}
+                          type="button"
+                          onClick={() => {
+                            setTeamLoginData(prev => ({
+                              ...prev,
+                              username: m.username,
+                              companyNameOrId: m.compName || prev.companyNameOrId
+                            }));
+                          }}
+                          style={{
+                            background: teamLoginData.username.toLowerCase() === String(m.username).toLowerCase() ? '#dbeafe' : '#f1f5f9',
+                            border: teamLoginData.username.toLowerCase() === String(m.username).toLowerCase() ? '1px solid #3b82f6' : '1px solid #cbd5e1',
+                            color: teamLoginData.username.toLowerCase() === String(m.username).toLowerCase() ? '#1d4ed8' : '#334155',
+                            borderRadius: '12px',
+                            padding: '2px 8px',
+                            fontSize: '0.72rem',
+                            cursor: 'pointer',
+                            fontWeight: 600
+                          }}
+                        >
+                          👤 {m.username}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn btn-primary"
-                style={{ marginTop: '8px', padding: '12px', width: '100%', fontSize: '0.9rem', justifyContent: 'center' }}
-              >
-                <span>{loading ? 'Authenticating...' : 'Sign In as Team Member'}</span>
-                <ArrowRight size={16} />
-              </button>
-            </form>
-          )}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label className="dossier-field-label" style={{ margin: 0 }}>Password *</label>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Team or Admin Password</span>
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <KeyRound size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input
+                      required
+                      type="password"
+                      className="dossier-input-control"
+                      style={{ paddingLeft: '38px' }}
+                      placeholder="Assigned password or Admin master password"
+                      value={teamLoginData.password}
+                      onChange={(e) => setTeamLoginData({ ...teamLoginData, password: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  fontSize: '0.73rem',
+                  color: '#166534',
+                  lineHeight: 1.4
+                }}>
+                  💡 <strong>No Special Company ID Needed:</strong> Pick your firm or leave Company blank to auto-detect. Size does not matter for password, username, or company name. Admin master password is also accepted!
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary"
+                  style={{ marginTop: '4px', padding: '12px', width: '100%', fontSize: '0.9rem', justifyContent: 'center' }}
+                >
+                  <span>{loading ? 'Authenticating...' : 'Sign In as Team Member'}</span>
+                  <ArrowRight size={16} />
+                </button>
+              </form>
+            );
+          })()}
         </div>
       </div>
     </div>

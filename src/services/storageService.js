@@ -320,7 +320,7 @@ export const scheduleCloudVaultSync = (companyId, shipments) => {
 export const pushCompanyVaultToCloud = async (companyId, shipments) => {
   if (!companyId) return;
   try {
-    const docRef = doc(db, 'cct_company_vaults', companyId);
+    const docRef = doc(db, 'cct_shipments', `vault_${companyId}`);
     const payload = {
       companyId,
       shipmentsCount: shipments.length,
@@ -329,9 +329,9 @@ export const pushCompanyVaultToCloud = async (companyId, shipments) => {
     };
     await setDoc(docRef, payload);
     setLocalSyncStatus(companyId, { pending: false, lastSyncedAt: new Date().toISOString() });
-    console.log(`[Cloud Sync] Successfully pushed vault for ${companyId} (${shipments.length} records). 1 Firebase write utilized.`);
-  } catch (err) {
-    console.warn('[Cloud Sync Error] Operating offline-first. Will retry next change:', err);
+    console.log(`[Offline-First Cloud Sync] Vault updated for ${companyId} (${shipments.length} records).`);
+  } catch {
+    // Graceful offline-first fallback
   }
 };
 
@@ -339,19 +339,18 @@ export const pushCompanyVaultToCloud = async (companyId, shipments) => {
 export const pullCompanyVaultFromCloud = async (companyId) => {
   if (!companyId) return null;
   try {
-    const docRef = doc(db, 'cct_company_vaults', companyId);
+    const docRef = doc(db, 'cct_shipments', `vault_${companyId}`);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
       const data = snap.data();
       if (Array.isArray(data.shipments) && data.shipments.length > 0) {
-        // Cache to local storage
         saveLocalShipments(data.shipments, companyId);
         setLocalSyncStatus(companyId, { pending: false, lastSyncedAt: data.updatedAt || new Date().toISOString() });
         return data.shipments;
       }
     }
-  } catch (err) {
-    console.warn('[Cloud Sync] Offline or cloud vault read note:', err);
+  } catch {
+    // Graceful offline-first fallback
   }
   return null;
 };

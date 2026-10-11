@@ -20,7 +20,8 @@ import {
   CheckCircle,
   HardDrive,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  Terminal
 } from 'lucide-react';
 
 export const Navbar = ({ 
@@ -32,6 +33,7 @@ export const Navbar = ({
   onOpenImportModal,
   onOpenMastersModal,
   onOpenTeamModal,
+  onOpenDevModal,
   onLogout,
   onTriggerSync,
   currentSession,
@@ -92,6 +94,27 @@ export const Navbar = ({
                 <div className="menu-header-label">
                   Administration & Configuration
                 </div>
+
+                {/* Developer Super-Admin Console */}
+                {currentSession?.isDeveloper && (
+                  <button
+                    id="btn-menu-dev-console"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      if (onOpenDevModal) onOpenDevModal();
+                    }}
+                    className="menu-item-action"
+                    style={{ background: 'linear-gradient(to right, rgba(245, 158, 11, 0.16), transparent)' }}
+                  >
+                    <div className="menu-icon-square" style={{ background: '#f59e0b', color: '#000000' }}>
+                      <Terminal size={17} />
+                    </div>
+                    <div>
+                      <div className="menu-item-title" style={{ color: '#fbbf24' }}>Developer Powers</div>
+                      <div className="menu-item-sub">Allow, revoke & delete firms globally</div>
+                    </div>
+                  </button>
+                )}
 
                 {/* 1. Assign Team Members */}
                 <button
@@ -180,7 +203,16 @@ export const Navbar = ({
                 {/* Sign Out Button */}
                 <button
                   id="btn-menu-logout"
-                  onClick={() => {
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsMenuOpen(false);
+                    if (onLogout) onLogout();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setIsMenuOpen(false);
                     if (onLogout) onLogout();
                   }}
@@ -293,7 +325,7 @@ export const Navbar = ({
             <span>Masters</span>
           </button>
 
-          {/* Offline-First Cloud Sync Status Chip */}
+          {/* Offline-First Bidirectional Sync Status Chip */}
           <div 
             onClick={handleManualSyncClick}
             style={{
@@ -301,26 +333,37 @@ export const Navbar = ({
               alignItems: 'center',
               gap: '6px',
               padding: '4px 10px',
-              background: syncStatus.pending ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-              border: syncStatus.pending ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(16, 185, 129, 0.35)',
+              background: syncStatus.status === 'error' ? 'rgba(239, 68, 68, 0.15)' 
+                : (syncStatus.status === 'syncing' || isSyncing) ? 'rgba(56, 189, 248, 0.15)'
+                : syncStatus.status === 'offline' ? 'rgba(245, 158, 11, 0.15)' 
+                : 'rgba(16, 185, 129, 0.15)',
+              border: syncStatus.status === 'error' ? '1px solid rgba(239, 68, 68, 0.35)' 
+                : (syncStatus.status === 'syncing' || isSyncing) ? '1px solid rgba(56, 189, 248, 0.35)'
+                : syncStatus.status === 'offline' ? '1px solid rgba(245, 158, 11, 0.35)' 
+                : '1px solid rgba(16, 185, 129, 0.35)',
               borderRadius: '20px',
               fontSize: '0.7rem',
               fontWeight: 700,
-              color: syncStatus.pending ? '#fbbf24' : '#34d399',
+              color: syncStatus.status === 'error' ? '#f87171' 
+                : (syncStatus.status === 'syncing' || isSyncing) ? '#38bdf8' 
+                : syncStatus.status === 'offline' ? '#fbbf24' 
+                : '#34d399',
               cursor: 'pointer',
               userSelect: 'none'
             }}
-            title={syncStatus.pending ? 'Local PC Saved • Click to push cloud sync now' : 'Local PC Saved & Cloud Synced. Click to force sync.'}
+            title={`Status: ${syncStatus.status || 'connected'} | Outbox Queue: ${syncStatus.metrics?.queueDepth || 0} | Pushed: ${syncStatus.metrics?.rowsPushed || 0} | Pulled: ${syncStatus.metrics?.rowsPulled || 0}. Click to trigger sync.`}
           >
             <HardDrive size={12} color="#38bdf8" />
-            {isSyncing ? (
+            {(isSyncing || syncStatus.status === 'syncing') ? (
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <RefreshCw size={11} className="animate-spin" /> Syncing...
               </span>
-            ) : syncStatus.pending ? (
-              <span>Local Saved (Pending Sync)</span>
+            ) : syncStatus.status === 'offline' ? (
+              <span>Offline (Local-First Active)</span>
+            ) : (syncStatus.metrics?.queueDepth > 0) ? (
+              <span>{syncStatus.metrics.queueDepth} Queued (Syncing...)</span>
             ) : (
-              <span>Offline-First (Safe & Synced)</span>
+              <span>🟢 Live Synced (Local-First)</span>
             )}
           </div>
 
@@ -332,6 +375,33 @@ export const Navbar = ({
             paddingLeft: '8px',
             borderLeft: '1px solid rgba(255, 255, 255, 0.12)'
           }}>
+            {/* Developer Console Button */}
+            {currentSession?.isDeveloper && (
+              <button
+                id="btn-nav-dev-console"
+                onClick={onOpenDevModal}
+                className="btn btn-sm"
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b, #ef4444)',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  border: 'none',
+                  boxShadow: '0 2px 12px rgba(245, 158, 11, 0.4)',
+                  padding: '5px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: '8px'
+                }}
+                title="Developer Super-Admin Console"
+              >
+                <Terminal size={14} />
+                <span>Dev Powers</span>
+              </button>
+            )}
+
+            {/* Active User Info & Sign Out */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -345,7 +415,7 @@ export const Navbar = ({
                 width: '24px',
                 height: '24px',
                 borderRadius: '50%',
-                background: currentSession?.userType === 'admin' ? '#f59e0b' : '#0284c7',
+                background: currentSession?.isDeveloper ? '#ef4444' : currentSession?.userType === 'admin' ? '#f59e0b' : '#0284c7',
                 color: '#ffffff',
                 fontWeight: 700,
                 fontSize: '0.75rem',
@@ -353,13 +423,13 @@ export const Navbar = ({
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                {displayName.charAt(0).toUpperCase()}
+                {currentSession?.isDeveloper ? '⚡' : displayName.charAt(0).toUpperCase()}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f8fafc' }}>
                   {displayName}
                 </span>
-                <span style={{ fontSize: '0.625rem', color: '#94a3b8' }}>
+                <span style={{ fontSize: '0.625rem', color: currentSession?.isDeveloper ? '#fbbf24' : '#94a3b8' }}>
                   {role}
                 </span>
               </div>

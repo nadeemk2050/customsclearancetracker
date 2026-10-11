@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './components/LoginPage';
 import { TeamManagementModal } from './components/TeamManagementModal';
+import { DeveloperConsoleModal } from './components/DeveloperConsoleModal';
 import { LossPreventionBanner } from './components/LossPreventionBanner';
 import { KpiMetrics } from './components/KpiMetrics';
 import { FilterToolbar } from './components/FilterToolbar';
@@ -32,6 +33,8 @@ import {
   setCurrentSession, 
   logout as authLogout 
 } from './services/authService';
+import { makeLive, stopSync, flushPending } from './sync/engine';
+import { subscribeSyncStatus } from './sync/status';
 import { calculateDetentionMetrics, calculateFleetRiskRadar } from './utils/detentionEngine';
 
 export function App() {
@@ -41,12 +44,13 @@ export function App() {
   // Application Data State
   const [shipments, setShipments] = useState([]);
   const [currentView, setCurrentView] = useState('dashboard'); // dashboard | radar | portal
-  const [syncStatus, setSyncStatus] = useState({ pending: false });
+  const [syncStatus, setSyncStatus] = useState({ status: 'connected', metrics: { queueDepth: 0 } });
 
   // Master Data State
   const [masters, setMasters] = useState(INITIAL_MASTERS);
   const [isMastersModalOpen, setIsMastersModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [isDevModalOpen, setIsDevModalOpen] = useState(false);
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,24 +68,33 @@ export function App() {
 
   const activeCompanyId = session?.companyId || 'cha_al_mumtaz';
 
-  // Subscribe to offline-first cache + cloud vault for Shipments
+  // Initialize Bidirectional Sync Engine & Observable Status for active tenant
   useEffect(() => {
     if (!session || !session.isLoggedIn) return;
 
-    const unsubscribe = subscribeToShipments(
+    // 1. Make tenant live (starts pusher & delta puller)
+    makeLive(activeCompanyId, {
+      name: session.companyName,
+      ownerEmail: session.email || ''
+    });
+
+    // 2. Subscribe to observable sync state store
+    const unsubStatus = subscribeSyncStatus((state) => {
+      setSyncStatus(state);
+    });
+
+    // 3. Subscribe to shipments (local first + remote updates)
+    const unsubShipments = subscribeToShipments(
       activeCompanyId,
       (data) => {
         setShipments(data);
-      },
-      (status) => {
-        setSyncStatus(status);
       }
     );
 
-    setSyncStatus(getLocalSyncStatus(activeCompanyId));
-
     return () => {
-      if (typeof unsubscribe === 'function') unsubscribe();
+      unsubStatus();
+      if (typeof unsubShipments === 'function') unsubShipments();
+      stopSync(activeCompanyId);
     };
   }, [session, activeCompanyId]);
 
@@ -179,10 +192,11 @@ export function App() {
   };
 
   const handleLogout = () => {
-    if (window.confirm('Are you sure you want to sign out from this CHA Company account?')) {
-      authLogout();
-      setSession(null);
-    }
+    try {
+      stopSync(activeCompanyId);
+    } catch {}
+    authLogout();
+    setSession(null);
   };
 
   // Manual Cloud Sync Trigger
@@ -315,6 +329,7 @@ export function App() {
         onOpenImportModal={() => setIsImportModalOpen(true)}
         onOpenMastersModal={() => setIsMastersModalOpen(true)}
         onOpenTeamModal={() => setIsTeamModalOpen(true)}
+        onOpenDevModal={() => setIsDevModalOpen(true)}
         onLogout={handleLogout}
         onTriggerSync={handleManualSync}
         currentSession={session}
@@ -407,6 +422,17 @@ export function App() {
         isOpen={isTeamModalOpen}
         onClose={() => setIsTeamModalOpen(false)}
         currentSession={session}
+      />
+
+      {/* Developer Super-Admin Console Modal */}
+      <DeveloperConsoleModal
+        isOpen={isDevModalOpen}
+        onClose={() => setIsDevModalOpen(false)}
+        currentSession={session}
+        onSessionChange={(updatedSession) => {
+          setSession(updatedSession);
+          setCurrentSession(updatedSession);
+        }}
       />
 
       {/* Deep-Dive Customs Dossier Drawer */}
