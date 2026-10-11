@@ -56,11 +56,11 @@ export const LoginPage = ({ onLoginSuccess }) => {
   // Auto-refresh registered companies on mount and listen in real-time
   React.useEffect(() => {
     refreshCompaniesFromCloud().then(updated => {
-      if (updated && updated.length > 0) setCompanies(updated);
+      if (Array.isArray(updated)) setCompanies(updated);
     }).catch(() => {});
 
     const unsubscribe = subscribeCloudCompanies((updated) => {
-      if (updated && updated.length > 0) setCompanies(updated);
+      if (Array.isArray(updated)) setCompanies(updated);
     });
 
     return () => {

@@ -25,7 +25,7 @@ const getClientApiKey = () => {
     return import.meta.env.VITE_FIREBASE_API_KEY;
   }
   try {
-    return atob('QUl6YVN5Q1NHRDBhenRxLXBoZmFMYjFRZG54TGR5VHcyV3hKUzJV');
+    return atob('QUl6YVN5Q1NHRDBhelRxLXBoZmFMYjFRZG54TGR5VHcyV3hKUzJV');
   } catch {
     return '';
   }

@@ -6,6 +6,7 @@ import {
   getDoc, 
   getDocs, 
   collection, 
+  deleteDoc,
   onSnapshot, 
   initFirebaseAuth 
 } from '../firebase/config';
@@ -66,16 +67,14 @@ const DEFAULT_DEMO_COMPANY = {
 export const getLocalCompanies = () => {
   try {
     const raw = localStorage.getItem(LOCAL_COMPANIES_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (err) {
     console.warn('Error reading local companies:', err);
   }
-  const initial = [DEFAULT_DEMO_COMPANY];
-  localStorage.setItem(LOCAL_COMPANIES_KEY, JSON.stringify(initial));
-  return initial;
+  return [];
 };
 
 // Save companies to local storage and broadcast to other open tabs/windows
@@ -120,54 +119,20 @@ export const refreshCompaniesFromCloud = async () => {
     const dirRef = doc(db, 'cct_shipments', 'companies_directory');
     const snap = await getDoc(dirRef);
     const local = getLocalCompanies();
-    const cloudList = snap.exists() && Array.isArray(snap.data()?.list) ? snap.data().list : [];
 
-    // Create unified map of all companies
-    const map = new Map();
-    // Default demo company always present
-    map.set(DEFAULT_DEMO_COMPANY.companyId, DEFAULT_DEMO_COMPANY);
-    
-    // Merge cloud companies
-    cloudList.forEach(c => map.set(c.companyId, c));
-
-    // Merge any locally registered companies (e.g. PAKOCEAN2 created in another browser tab)
-    let needsCloudSync = false;
-    local.forEach(c => {
-      if (!map.has(c.companyId)) {
-        map.set(c.companyId, c);
-        needsCloudSync = true;
-      } else {
-        const existing = map.get(c.companyId);
-        const memberMap = new Map();
-        (existing.teamMembers || []).forEach(m => memberMap.set(String(m.username || '').toLowerCase(), m));
-        (c.teamMembers || []).forEach(m => {
-          const uKey = String(m.username || '').toLowerCase();
-          if (!memberMap.has(uKey)) {
-            memberMap.set(uKey, m);
-            needsCloudSync = true;
-          }
-        });
-        existing.teamMembers = Array.from(memberMap.values());
-        map.set(c.companyId, existing);
-      }
-    });
-
-    const merged = Array.from(map.values());
-    saveLocalCompanies(merged);
-
-    // If local has companies not yet in cloud, immediately sync them up to Firebase
-    if (needsCloudSync || !snap.exists()) {
-      try {
-        await setDoc(dirRef, { list: merged, updatedAt: new Date().toISOString() }, { merge: true });
-      } catch {}
+    if (snap.exists() && Array.isArray(snap.data()?.list)) {
+      const cloudList = snap.data().list;
+      saveLocalCompanies(cloudList);
+      return cloudList;
     }
 
-    return merged;
+    return local;
   } catch {
     // Offline-safe fallback
   }
   return getLocalCompanies();
 };
+
 
 // Real-time listener for companies directory across all devices
 export const subscribeCloudCompanies = (onUpdate) => {
@@ -186,13 +151,8 @@ export const subscribeCloudCompanies = (onUpdate) => {
     return onSnapshot(dirRef, (snap) => {
       if (snap.exists() && Array.isArray(snap.data()?.list)) {
         const cloudList = snap.data().list;
-        const local = getLocalCompanies();
-        const map = new Map();
-        local.forEach(c => map.set(c.companyId, c));
-        cloudList.forEach(c => map.set(c.companyId, c));
-        const merged = Array.from(map.values());
-        saveLocalCompanies(merged);
-        onUpdate(merged);
+        saveLocalCompanies(cloudList);
+        onUpdate(cloudList);
       }
     }, () => {});
   } catch {
@@ -294,7 +254,7 @@ export const loginCompanyAdmin = async ({ usernameOrCompany, password }) => {
 
   // Master Developer Super-Admin Recognition (nadeemalsaham@gmail.com)
   if (query === 'nadeemalsaham@gmail.com' || query === 'nadeemalsaham' || cleanQuery === 'nadeemalsaham') {
-    const firstComp = companies[0] || DEFAULT_DEMO_COMPANY;
+    const firstComp = companies[0] || { companyId: 'dev_global_hub', companyName: 'Global Developer Hub' };
     const session = {
       isLoggedIn: true,
       userType: 'developer',
@@ -602,19 +562,93 @@ export const devDeleteCompany = async (companyId) => {
   if (!session?.isDeveloper) throw new Error('Unauthorized: Developer privileges required.');
 
   let companies = getLocalCompanies();
+  try {
+    await initFirebaseAuth();
+    const dirRef = doc(db, 'cct_shipments', 'companies_directory');
+    const snap = await getDoc(dirRef);
+    if (snap.exists() && Array.isArray(snap.data()?.list)) {
+      companies = snap.data().list;
+    }
+  } catch {}
+
   const filtered = companies.filter(c => c.companyId !== companyId);
   saveLocalCompanies(filtered);
+
+  // Clean local workspace cache for this company
+  try {
+    localStorage.removeItem(`cct_pro_shipments_${companyId}`);
+    localStorage.removeItem(`cct_pro_masters_${companyId}`);
+    localStorage.removeItem(`cct_pro_sync_${companyId}`);
+  } catch {}
 
   // Sync deletion to cloud directory
   try {
     await initFirebaseAuth();
     const dirRef = doc(db, 'cct_shipments', 'companies_directory');
     await setDoc(dirRef, { list: filtered, updatedAt: new Date().toISOString() });
+    try {
+      await deleteDoc(doc(db, 'cct_shipments', `company_${companyId}`));
+      await deleteDoc(doc(db, 'cct_shipments', `vault_${companyId}`));
+    } catch {}
     if (companyBus) companyBus.postMessage({ type: 'COMPANIES_UPDATED', list: filtered });
   } catch {}
 
   return filtered;
 };
+
+// Developer Power: WIPE / ZERO ALL COMPANIES & RESTART FRESH FROM SCRATCH
+export const devZeroAllCompanies = async () => {
+  const session = getCurrentSession();
+  if (!session?.isDeveloper) throw new Error('Unauthorized: Developer privileges required.');
+
+  let allCompanies = getLocalCompanies();
+  try {
+    await initFirebaseAuth();
+    const dirRef = doc(db, 'cct_shipments', 'companies_directory');
+    const snap = await getDoc(dirRef);
+    if (snap.exists() && Array.isArray(snap.data()?.list)) {
+      allCompanies = snap.data().list;
+    }
+  } catch {}
+
+  const emptyList = [];
+  saveLocalCompanies(emptyList);
+
+  // Clean local data caches
+  try {
+    for (const c of allCompanies) {
+      localStorage.removeItem(`cct_pro_shipments_${c.companyId}`);
+      localStorage.removeItem(`cct_pro_masters_${c.companyId}`);
+      localStorage.removeItem(`cct_pro_sync_${c.companyId}`);
+    }
+    localStorage.removeItem('cct_pro_shipments_cha_al_mumtaz');
+    localStorage.removeItem('cct_pro_masters_cha_al_mumtaz');
+    localStorage.removeItem('cct_pro_sync_cha_al_mumtaz');
+  } catch {}
+
+  try {
+    await initFirebaseAuth();
+    const dirRef = doc(db, 'cct_shipments', 'companies_directory');
+    await setDoc(dirRef, { list: emptyList, updatedAt: new Date().toISOString() });
+    
+    for (const c of allCompanies) {
+      try {
+        await deleteDoc(doc(db, 'cct_shipments', `company_${c.companyId}`));
+        await deleteDoc(doc(db, 'cct_shipments', `vault_${c.companyId}`));
+      } catch {}
+    }
+
+    try {
+      await deleteDoc(doc(db, 'cct_shipments', 'company_cha_al_mumtaz'));
+      await deleteDoc(doc(db, 'cct_shipments', 'vault_cha_al_mumtaz'));
+    } catch {}
+
+    if (companyBus) companyBus.postMessage({ type: 'COMPANIES_UPDATED', list: emptyList });
+  } catch {}
+
+  return emptyList;
+};
+
 
 // Developer Power: Revoke / Allow Company access
 export const devToggleCompanyStatus = async (companyId, newStatus) => {

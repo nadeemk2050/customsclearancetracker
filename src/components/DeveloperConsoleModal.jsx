@@ -23,6 +23,7 @@ import {
   getLocalCompanies, 
   refreshCompaniesFromCloud,
   devDeleteCompany,
+  devZeroAllCompanies,
   devToggleCompanyStatus,
   devDeleteTeamMember,
   devResetCompanyPassword,
@@ -71,13 +72,36 @@ export const DeveloperConsoleModal = ({ isOpen, onClose, currentSession, onSessi
 
   const handleDeleteCompany = async (companyId, companyName) => {
     if (window.confirm(`⚠️ DEVELOPER ACTION: Are you sure you want to PERMANENTLY DELETE company "${companyName}" and all its team members? This cannot be undone.`)) {
+      setLoading(true);
       try {
         const updated = await devDeleteCompany(companyId);
         setCompanies(updated);
-        notify(`Company "${companyName}" deleted globally.`);
+        notify(`Company "${companyName}" deleted permanently from cloud and local storage.`);
       } catch (err) {
         notifyError(err.message);
+      } finally {
+        setLoading(false);
       }
+    }
+  };
+
+  const handleZeroAllCompanies = async () => {
+    const confirmation = window.prompt(
+      '⚠️ CRITICAL DEVELOPER RESET ⚠️\n\nAre you sure you want to ZERO / DELETE ALL COMPANIES and all their team members from the entire database to start 100% from scratch?\n\nType "ZERO" in capital letters to confirm:'
+    );
+    if (confirmation === 'ZERO') {
+      setLoading(true);
+      try {
+        const updated = await devZeroAllCompanies();
+        setCompanies(updated);
+        notify('💥 All companies have been wiped from the database. System is at zero companies.');
+      } catch (err) {
+        notifyError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    } else if (confirmation !== null) {
+      notifyError('Action cancelled. Confirmation word "ZERO" was not typed.');
     }
   };
 
@@ -214,6 +238,29 @@ export const DeveloperConsoleModal = ({ isOpen, onClose, currentSession, onSessi
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
+              onClick={handleZeroAllCompanies}
+              disabled={loading}
+              className="btn btn-sm"
+              style={{
+                background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                border: '1px solid #ef4444',
+                color: '#ffffff',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.4)'
+              }}
+              title="Delete all companies and team members to restart from scratch"
+            >
+              <Trash2 size={13} />
+              <span>Zero All Companies</span>
+            </button>
+            <button
               onClick={loadCompanies}
               disabled={loading}
               className="btn btn-outline btn-sm text-slate-300"
@@ -304,8 +351,14 @@ export const DeveloperConsoleModal = ({ isOpen, onClose, currentSession, onSessi
         {/* Companies List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.75rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {filteredCompanies.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-              No companies found matching "{search}".
+            <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#111c38', borderRadius: '12px', border: '1px dashed #334155' }}>
+              <Building2 size={42} color="#64748b" style={{ margin: '0 auto 12px' }} />
+              <h4 style={{ color: '#f8fafc', fontSize: '1rem', fontWeight: 800, margin: '0 0 6px' }}>
+                {search ? `No companies matching "${search}"` : 'Database is Zeroed (0 Companies)'}
+              </h4>
+              <p style={{ color: '#94a3b8', fontSize: '0.8rem', maxWidth: '440px', margin: '0 auto 16px', lineHeight: 1.5 }}>
+                {search ? 'Try clearing your search query.' : 'All companies have been completely removed. You can now register brand new CHA companies from scratch on the Sign Up tab.'}
+              </p>
             </div>
           ) : (
             filteredCompanies.map((comp) => {
