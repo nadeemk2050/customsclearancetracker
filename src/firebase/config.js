@@ -49,28 +49,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Authenticate anonymously so Firestore & Firebase rules grant full authenticated access
-export const initFirebaseAuth = () => {
-  return new Promise((resolve) => {
-    try {
-      onAuthStateChanged(auth, (user) => {
-        if (user) {
-          resolve(user);
-        } else {
-          signInAnonymously(auth)
-            .then((cred) => resolve(cred.user))
-            .catch(() => resolve(null));
-        }
-      });
-    } catch {
-      resolve(null);
-    }
-  });
-};
-
-if (typeof window !== "undefined") {
-  initFirebaseAuth();
-}
+// Authenticate helper (Firestore security rules grant access directly)
+export const initFirebaseAuth = () => Promise.resolve(null);
 
 // Initialize Analytics conditionally (safely handles environments where analytics isn't supported)
 let analytics = null;

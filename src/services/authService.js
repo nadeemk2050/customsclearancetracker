@@ -115,20 +115,32 @@ export const setCurrentSession = (session) => {
 // Cloud sync helper: Bidirectional merge with Firebase Firestore directory
 export const refreshCompaniesFromCloud = async () => {
   try {
-    await initFirebaseAuth();
     const dirRef = doc(db, 'cct_shipments', 'companies_directory');
     const snap = await getDoc(dirRef);
     const local = getLocalCompanies();
 
     if (snap.exists() && Array.isArray(snap.data()?.list)) {
       const cloudList = snap.data().list;
+      // If local storage has newly registered companies not yet in cloud, upload them
+      const cloudIds = new Set(cloudList.map(c => c.companyId));
+      const unSynced = local.filter(c => !cloudIds.has(c.companyId));
+      if (unSynced.length > 0) {
+        const merged = [...cloudList, ...unSynced];
+        await setDoc(dirRef, { list: merged, updatedAt: new Date().toISOString() });
+        saveLocalCompanies(merged);
+        return merged;
+      }
       saveLocalCompanies(cloudList);
       return cloudList;
+    } else if (local.length > 0) {
+      // Cloud directory doc does not exist yet, initialize it with local companies
+      await setDoc(dirRef, { list: local, updatedAt: new Date().toISOString() });
+      return local;
     }
 
     return local;
-  } catch {
-    // Offline-safe fallback
+  } catch (err) {
+    console.warn('Cloud sync fallback to local:', err);
   }
   return getLocalCompanies();
 };
@@ -154,7 +166,9 @@ export const subscribeCloudCompanies = (onUpdate) => {
         saveLocalCompanies(cloudList);
         onUpdate(cloudList);
       }
-    }, () => {});
+    }, (err) => {
+      console.warn('Companies snapshot listener note:', err?.message || err);
+    });
   } catch {
     return () => {};
   }
@@ -163,18 +177,18 @@ export const subscribeCloudCompanies = (onUpdate) => {
 // Sync single company to shared cloud directory
 const syncCompanyToCloudDirectory = async (companyData) => {
   try {
-    await initFirebaseAuth();
     const dirRef = doc(db, 'cct_shipments', 'companies_directory');
     const snap = await getDoc(dirRef);
     const existing = snap.exists() && Array.isArray(snap.data()?.list) ? snap.data().list : [];
     const filtered = existing.filter(c => c.companyId !== companyData.companyId);
     filtered.push(companyData);
-    await setDoc(dirRef, { list: filtered, updatedAt: new Date().toISOString() }, { merge: true });
+    await setDoc(dirRef, { list: filtered, updatedAt: new Date().toISOString() });
+    saveLocalCompanies(filtered);
     if (companyBus) {
       companyBus.postMessage({ type: 'COMPANIES_UPDATED', list: filtered });
     }
-  } catch {
-    // Offline-safe fallback
+  } catch (err) {
+    console.error('Error syncing company to cloud directory:', err);
   }
 };
 
@@ -250,10 +264,13 @@ export const loginCompanyAdmin = async ({ usernameOrCompany, password }) => {
   let companies = getLocalCompanies();
   const query = usernameOrCompany.trim().toLowerCase();
   const cleanQuery = query.replace(/[^a-z0-9]/g, '');
-  const pwd = password.trim().toLowerCase();
+  const pwd = password.trim();
 
   // Master Developer Super-Admin Recognition (nadeemalsaham@gmail.com)
   if (query === 'nadeemalsaham@gmail.com' || query === 'nadeemalsaham' || cleanQuery === 'nadeemalsaham') {
+    if (pwd !== '123' && pwd.toLowerCase() !== 'admin') {
+      throw new Error('Invalid Developer Master password.');
+    }
     const firstComp = companies[0] || { companyId: 'dev_global_hub', companyName: 'Global Developer Hub' };
     const session = {
       isLoggedIn: true,
@@ -270,31 +287,28 @@ export const loginCompanyAdmin = async ({ usernameOrCompany, password }) => {
     return session;
   }
 
-  let found = companies.find(c => {
-    const uMatch = c.adminUsername.toLowerCase() === query;
-    const cMatch = c.companyName.toLowerCase() === query || 
-                   c.companyName.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanQuery ||
-                   c.companyName.toLowerCase().includes(query) ||
-                   query.includes(c.companyName.toLowerCase());
-    const eMatch = c.adminEmail && c.adminEmail.toLowerCase() === query;
-    const pMatch = String(c.adminPassword || '').trim().toLowerCase() === pwd;
+  const matchCompany = (c) => {
+    const cleanCompName = String(c.companyName || '').trim().toLowerCase();
+    const cleanCompAlpha = cleanCompName.replace(/[^a-z0-9]/g, '');
+    const cleanAdminUser = String(c.adminUsername || '').trim().toLowerCase();
+    const cleanAdminEmail = String(c.adminEmail || '').trim().toLowerCase();
+
+    // Exact matches only: admin username, official company name, or official email
+    const uMatch = cleanAdminUser === query;
+    const cMatch = cleanCompName === query || (cleanQuery.length > 0 && cleanCompAlpha === cleanQuery);
+    const eMatch = cleanAdminEmail.length > 0 && cleanAdminEmail === query;
+    const pMatch = String(c.adminPassword || '').trim() === pwd;
+
     return (uMatch || cMatch || eMatch) && pMatch;
-  });
+  };
+
+  let found = companies.find(matchCompany);
 
   if (!found) {
     // Try refreshing from cloud
     try {
       companies = await refreshCompaniesFromCloud();
-      found = companies.find(c => {
-        const uMatch = c.adminUsername.toLowerCase() === query;
-        const cMatch = c.companyName.toLowerCase() === query || 
-                       c.companyName.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanQuery ||
-                       c.companyName.toLowerCase().includes(query) ||
-                       query.includes(c.companyName.toLowerCase());
-        const eMatch = c.adminEmail && c.adminEmail.toLowerCase() === query;
-        const pMatch = String(c.adminPassword || '').trim().toLowerCase() === pwd;
-        return (uMatch || cMatch || eMatch) && pMatch;
-      });
+      found = companies.find(matchCompany);
     } catch {}
   }
 
@@ -359,7 +373,7 @@ export const loginTeamMember = async ({ companyNameOrId, username, password }) =
 
   let targetMatch = null;
 
-  // Pass 1: If company name/id was provided, check matching companies
+  // If company name/id was provided, check ONLY the matching company
   if (cleanCompany) {
     for (const comp of companies) {
       const cName = String(comp.companyName || '').trim().toLowerCase();
@@ -368,33 +382,49 @@ export const loginTeamMember = async ({ companyNameOrId, username, password }) =
 
       const isCompMatch = cName === rawCompany.toLowerCase() ||
                           cId === rawCompany.toLowerCase() ||
-                          cAlpha === cleanCompany ||
-                          (cleanCompany.length >= 3 && (cAlpha.includes(cleanCompany) || cleanCompany.includes(cAlpha)));
+                          cAlpha === cleanCompany;
 
       if (isCompMatch) {
         targetMatch = testCompanyForMember(comp);
         if (targetMatch) break;
       }
     }
-  }
 
-  // Pass 2: Search ALL registered companies (Auto-Detect company by username & password!)
-  if (!targetMatch) {
+    if (!targetMatch) {
+      try {
+        const refreshedCompanies = await refreshCompaniesFromCloud();
+        for (const comp of refreshedCompanies) {
+          const cName = String(comp.companyName || '').trim().toLowerCase();
+          const cId = String(comp.companyId || '').trim().toLowerCase();
+          const cAlpha = cName.replace(/[^a-z0-9]/g, '');
+
+          const isCompMatch = cName === rawCompany.toLowerCase() ||
+                              cId === rawCompany.toLowerCase() ||
+                              cAlpha === cleanCompany;
+
+          if (isCompMatch) {
+            targetMatch = testCompanyForMember(comp);
+            if (targetMatch) break;
+          }
+        }
+      } catch {}
+    }
+  } else {
+    // If no specific company was given, auto-detect across companies
     for (const comp of companies) {
       targetMatch = testCompanyForMember(comp);
       if (targetMatch) break;
     }
-  }
 
-  // Pass 3: If still not found, refresh from cloud directory and re-try
-  if (!targetMatch) {
-    try {
-      const refreshedCompanies = await refreshCompaniesFromCloud();
-      for (const comp of refreshedCompanies) {
-        targetMatch = testCompanyForMember(comp);
-        if (targetMatch) break;
-      }
-    } catch {}
+    if (!targetMatch) {
+      try {
+        const refreshedCompanies = await refreshCompaniesFromCloud();
+        for (const comp of refreshedCompanies) {
+          targetMatch = testCompanyForMember(comp);
+          if (targetMatch) break;
+        }
+      } catch {}
+    }
   }
 
   if (targetMatch) {
