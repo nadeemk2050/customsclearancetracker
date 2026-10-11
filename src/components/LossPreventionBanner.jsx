@@ -8,16 +8,9 @@ export const LossPreventionBanner = ({ fleetMetrics, onFilterUrgent }) => {
 
   return (
     <aside className="prevention-banner" aria-label="Demurrage Loss Prevention Alert">
-      <div className="banner-content">
+      <div className="banner-content" style={{ justifyContent: 'flex-start', gap: '12px' }}>
         <div className="radar-indicator">
           <span className="pulse-dot"></span>
-          <strong className="text-white flex items-center gap-1.5 font-bold tracking-wide">
-            <ShieldAlert size={16} className="text-red-400" />
-            DEMURRAGE & PORT STORAGE LOSS PREVENTION RADAR:
-          </strong>
-          <span className="text-slate-300 text-xs hidden md:inline">
-            Active multi-clock monitoring across terminal free days, line detention cutoffs & DO validities.
-          </span>
         </div>
 
         <div className="radar-pill-group">

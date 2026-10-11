@@ -119,9 +119,6 @@ export const ShipmentTable = ({
             {shipments.length} Records
           </span>
         </div>
-        <p className="text-xs text-slate-500 hidden sm:block">
-          Click any row chevron to expand container equipment details, EIR receipt numbers, and gate passes.
-        </p>
       </div>
 
       <div className="table-responsive">

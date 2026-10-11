@@ -262,14 +262,6 @@ export const Navbar = ({
                 <span>{companyName}</span>
               </div>
             </div>
-
-            <div className="brand-subtitle flex items-center gap-2" style={{ marginTop: '2px' }}>
-              <span>Enterprise Customs & Demurrage Shield</span>
-              <span style={{ color: '#64748b' }}>•</span>
-              <span className="inline-flex items-center gap-1 text-xs text-sky-300">
-                <Globe size={11} /> customsclearance-tracker.web.app
-              </span>
-            </div>
           </div>
         </div>
 
@@ -303,27 +295,7 @@ export const Navbar = ({
             <span>Public Tracking Portal</span>
           </button>
 
-          {/* Quick Assign Team Button on Header */}
-          <button
-            id="btn-nav-assign-team"
-            onClick={onOpenTeamModal}
-            className="btn btn-outline btn-sm text-sky-200 border-sky-400/30 hover:bg-sky-500/10 flex items-center gap-1.5"
-            title="Assign and manage team members, roles & passwords"
-          >
-            <Users size={15} className="text-sky-400" />
-            <span>Assign Team</span>
-          </button>
 
-          {/* Direct Manage Masters Button on Header */}
-          <button
-            id="btn-nav-manage-masters"
-            onClick={onOpenMastersModal}
-            className="btn btn-outline btn-sm text-slate-300 border-slate-600/50 hover:bg-white/10 hidden md:inline-flex items-center gap-1.5"
-            title="Manage Shipping Lines, Consignees, Shippers, Ports & Cargo"
-          >
-            <Database size={15} className="text-slate-400" />
-            <span>Masters</span>
-          </button>
 
           {/* Offline-First Bidirectional Sync Status Chip */}
           <div 
@@ -434,14 +406,6 @@ export const Navbar = ({
                 </span>
               </div>
             </div>
-
-            <button
-              onClick={onLogout}
-              className="btn btn-outline btn-sm text-slate-300 hover:text-rose-400 hover:border-rose-400/40 p-1.5"
-              title="Sign Out"
-            >
-              <LogOut size={15} />
-            </button>
           </div>
 
           {/* New Shipment BL CTA Button */}

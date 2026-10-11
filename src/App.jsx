@@ -452,19 +452,6 @@ export function App() {
         onRestoreData={handleRestoreData}
       />
 
-      {/* Enterprise Footer */}
-      <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 no-print">
-        <div className="app-container flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>
-            © 2026 CustomsTrack Pro (CCT) • Active Account:{' '}
-            <strong className="text-slate-800">{session.companyName}</strong>
-          </p>
-          <p className="text-slate-400 font-mono">
-            Storage Engine: <span className="text-emerald-600 font-bold">Offline-First Local PC</span> • Cloud Vault:{' '}
-            <span className="text-sky-600 font-bold">{activeCompanyId}</span>
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
