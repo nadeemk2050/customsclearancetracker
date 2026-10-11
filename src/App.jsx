@@ -12,6 +12,7 @@ import { DossierDrawer } from './components/DossierDrawer';
 import { CustomerPortal } from './components/CustomerPortal';
 import { ExportImportModal } from './components/ExportImportModal';
 import { LossPreventionRadarView } from './components/LossPreventionRadarView';
+import { AllBlMasterView } from './components/AllBlMasterView';
 import { ManageMastersModal } from './components/ManageMastersModal';
 import { 
   subscribeToShipments, 
@@ -396,6 +397,20 @@ export function App() {
               onDeleteShipment={handleDeleteShipment}
               onQuickUpdateStatus={handleQuickUpdateStatus}
               onQuickContainerReturn={handleQuickContainerReturn}
+            />
+          </div>
+        )}
+
+        {currentView === 'bl-master' && (
+          <div className="app-container pt-4">
+            <AllBlMasterView
+              shipments={shipments}
+              onViewDossier={handleViewDossier}
+              onEditShipment={handleEditShipment}
+              onAddNewShipment={() => {
+                setEditingShipment(null);
+                setIsModalOpen(true);
+              }}
             />
           </div>
         )}

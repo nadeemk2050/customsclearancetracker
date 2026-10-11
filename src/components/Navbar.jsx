@@ -21,7 +21,8 @@ import {
   HardDrive,
   RefreshCw,
   UserCheck,
-  Terminal
+  Terminal,
+  Table
 } from 'lucide-react';
 
 export const Navbar = ({ 
@@ -110,6 +111,25 @@ export const Navbar = ({
                   <div>
                     <div className="menu-item-title" style={{ color: currentView === 'dashboard' ? '#38bdf8' : '#f8fafc' }}>Operations Command</div>
                     <div className="menu-item-sub">Active BL shipments & dossiers</div>
+                  </div>
+                </button>
+
+                {/* All BL Consignments Master Directory */}
+                <button
+                  id="btn-menu-all-bl-master"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setCurrentView('bl-master');
+                  }}
+                  className={`menu-item-action ${currentView === 'bl-master' ? 'menu-item-highlight' : ''}`}
+                  style={currentView === 'bl-master' ? { background: 'linear-gradient(to right, rgba(251, 191, 36, 0.18), transparent)' } : {}}
+                >
+                  <div className="menu-icon-square" style={{ background: currentView === 'bl-master' ? '#f59e0b' : '#1e293b', color: currentView === 'bl-master' ? '#000000' : '#fbbf24' }}>
+                    <Table size={17} />
+                  </div>
+                  <div>
+                    <div className="menu-item-title" style={{ color: currentView === 'bl-master' ? '#fbbf24' : '#f8fafc' }}>All BL Consignments Directory</div>
+                    <div className="menu-item-sub">All active & cleared BL records in 1 list</div>
                   </div>
                 </button>
 

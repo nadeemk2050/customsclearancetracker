@@ -302,7 +302,7 @@ export const ShipmentModal = ({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-0.01em' }}>
-                  {shipmentToEdit ? `Edit Shipment Dossier — ${shipmentToEdit.blNo}` : 'Create New Customs Clearance Dossier'}
+                  {shipmentToEdit ? `Edit Shipment Dossier — ${shipmentToEdit.blNo}` : 'Add New BL Consignment Details'}
                 </h2>
                 <span className="brand-badge">Full Suite</span>
               </div>
