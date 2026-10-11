@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Navbar } from './components/Navbar';
+import { LoginPage } from './components/LoginPage';
+import { TeamManagementModal } from './components/TeamManagementModal';
 import { LossPreventionBanner } from './components/LossPreventionBanner';
 import { KpiMetrics } from './components/KpiMetrics';
 import { FilterToolbar } from './components/FilterToolbar';
@@ -15,6 +17,8 @@ import {
   persistShipment, 
   removeShipment, 
   saveLocalShipments,
+  pushCompanyVaultToCloud,
+  getLocalSyncStatus,
   exportToJsonFile, 
   exportToCsvFile 
 } from './services/storageService';
@@ -23,16 +27,26 @@ import {
   persistMasters, 
   INITIAL_MASTERS 
 } from './services/masterService';
+import { 
+  getCurrentSession, 
+  setCurrentSession, 
+  logout as authLogout 
+} from './services/authService';
 import { calculateDetentionMetrics, calculateFleetRiskRadar } from './utils/detentionEngine';
 
 export function App() {
+  // Session State (Multi-Tenant Authentication)
+  const [session, setSession] = useState(() => getCurrentSession());
+
   // Application Data State
   const [shipments, setShipments] = useState([]);
   const [currentView, setCurrentView] = useState('dashboard'); // dashboard | radar | portal
+  const [syncStatus, setSyncStatus] = useState({ pending: false });
 
   // Master Data State
   const [masters, setMasters] = useState(INITIAL_MASTERS);
   const [isMastersModalOpen, setIsMastersModalOpen] = useState(false);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,32 +62,41 @@ export function App() {
   const [isDossierOpen, setIsDossierOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  // Subscribe to live Firestore + local cache for Shipments
+  const activeCompanyId = session?.companyId || 'cha_al_mumtaz';
+
+  // Subscribe to offline-first cache + cloud vault for Shipments
   useEffect(() => {
+    if (!session || !session.isLoggedIn) return;
+
     const unsubscribe = subscribeToShipments(
+      activeCompanyId,
       (data) => {
         setShipments(data);
       },
-      (error) => {
-        console.warn('Sync notice:', error);
+      (status) => {
+        setSyncStatus(status);
       }
     );
+
+    setSyncStatus(getLocalSyncStatus(activeCompanyId));
 
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, []);
+  }, [session, activeCompanyId]);
 
-  // Subscribe to live Firestore + local cache for Masters
+  // Subscribe to offline-first cache + cloud vault for Masters
   useEffect(() => {
-    const unsubscribe = subscribeToMasters((data) => {
+    if (!session || !session.isLoggedIn) return;
+
+    const unsubscribe = subscribeToMasters(activeCompanyId, (data) => {
       setMasters(data);
     });
 
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, []);
+  }, [session, activeCompanyId]);
 
   // Compute fleet risk metrics
   const fleetMetrics = useMemo(() => {
@@ -149,7 +172,26 @@ export function App() {
     });
   }, [shipments, searchQuery, selectedLine, selectedStatus, selectedRisk, activePreset]);
 
-  // Handlers
+  // Auth Handlers
+  const handleLoginSuccess = (newSession) => {
+    setCurrentSession(newSession);
+    setSession(newSession);
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to sign out from this CHA Company account?')) {
+      authLogout();
+      setSession(null);
+    }
+  };
+
+  // Manual Cloud Sync Trigger
+  const handleManualSync = async () => {
+    await pushCompanyVaultToCloud(activeCompanyId, shipments);
+    setSyncStatus({ pending: false, lastSyncedAt: new Date().toISOString() });
+  };
+
+  // Handlers for shipments
   const handleOpenNewModal = () => {
     setEditingShipment(null);
     setIsModalOpen(true);
@@ -166,8 +208,9 @@ export function App() {
   };
 
   const handleSaveShipment = async (formData) => {
-    const updated = await persistShipment(formData, shipments);
+    const updated = await persistShipment(formData, shipments, activeCompanyId);
     setShipments(updated);
+    setSyncStatus({ pending: true });
     if (dossierShipment && dossierShipment.id === formData.id) {
       setDossierShipment(formData);
     }
@@ -175,8 +218,9 @@ export function App() {
 
   const handleDeleteShipment = async (id) => {
     if (window.confirm('Are you sure you want to delete this Bill of Lading shipment record? This action cannot be undone.')) {
-      const updated = await removeShipment(id, shipments);
+      const updated = await removeShipment(id, shipments, activeCompanyId);
       setShipments(updated);
+      setSyncStatus({ pending: true });
       if (dossierShipment && dossierShipment.id === id) {
         setIsDossierOpen(false);
       }
@@ -189,8 +233,9 @@ export function App() {
       customsStatus: newStatus,
       updatedAt: new Date().toISOString()
     };
-    const newList = await persistShipment(updated, shipments);
+    const newList = await persistShipment(updated, shipments, activeCompanyId);
     setShipments(newList);
+    setSyncStatus({ pending: true });
     if (dossierShipment && dossierShipment.id === shipment.id) {
       setDossierShipment(updated);
     }
@@ -226,8 +271,9 @@ export function App() {
       updatedAt: new Date().toISOString()
     };
 
-    const newList = await persistShipment(updatedShipment, shipments);
+    const newList = await persistShipment(updatedShipment, shipments, activeCompanyId);
     setShipments(newList);
+    setSyncStatus({ pending: true });
     if (dossierShipment && dossierShipment.id === shipment.id) {
       setDossierShipment(updatedShipment);
     }
@@ -242,26 +288,37 @@ export function App() {
   };
 
   const handleRestoreData = (newList) => {
-    saveLocalShipments(newList);
+    saveLocalShipments(newList, activeCompanyId);
     setShipments(newList);
+    setSyncStatus({ pending: true });
   };
 
   const handleSaveMasters = async (newMasters) => {
-    await persistMasters(newMasters);
+    await persistMasters(newMasters, activeCompanyId);
     setMasters(newMasters);
   };
 
+  // If user is not authenticated, render Login & Sign Up Portal
+  if (!session || !session.isLoggedIn) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc]">
-      {/* 1. Top Navbar with Hamburger Menu & Manage Masters */}
+      {/* 1. Top Navbar with Hamburger Menu, CHA Company Badge, and Sync Status */}
       <Navbar
         currentView={currentView}
         setCurrentView={setCurrentView}
         onOpenNewModal={handleOpenNewModal}
-        onExportJson={() => exportToJsonFile(shipments)}
-        onExportCsv={() => exportToCsvFile(shipments)}
+        onExportJson={() => exportToJsonFile(shipments, session.companyName)}
+        onExportCsv={() => exportToCsvFile(shipments, session.companyName)}
         onOpenImportModal={() => setIsImportModalOpen(true)}
         onOpenMastersModal={() => setIsMastersModalOpen(true)}
+        onOpenTeamModal={() => setIsTeamModalOpen(true)}
+        onLogout={handleLogout}
+        onTriggerSync={handleManualSync}
+        currentSession={session}
+        syncStatus={syncStatus}
         totalShipments={shipments.length}
       />
 
@@ -345,6 +402,13 @@ export function App() {
         onSaveMasters={handleSaveMasters}
       />
 
+      {/* Assign Team Members Modal */}
+      <TeamManagementModal
+        isOpen={isTeamModalOpen}
+        onClose={() => setIsTeamModalOpen(false)}
+        currentSession={session}
+      />
+
       {/* Deep-Dive Customs Dossier Drawer */}
       <DossierDrawer
         isOpen={isDossierOpen}
@@ -362,12 +426,16 @@ export function App() {
         onRestoreData={handleRestoreData}
       />
 
-      {/* Footer */}
+      {/* Enterprise Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 no-print">
         <div className="app-container flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>© 2026 CustomsTrack Pro (CCT). Professional Customs Clearing & Demurrage Shield Suite.</p>
+          <p>
+            © 2026 CustomsTrack Pro (CCT) • Active Account:{' '}
+            <strong className="text-slate-800">{session.companyName}</strong>
+          </p>
           <p className="text-slate-400 font-mono">
-            Firebase Project: <span className="text-slate-600 font-bold">proformatracker</span> • Hosting Site: <span className="text-sky-600 font-bold">customsclearance-tracker</span>
+            Storage Engine: <span className="text-emerald-600 font-bold">Offline-First Local PC</span> • Cloud Vault:{' '}
+            <span className="text-sky-600 font-bold">{activeCompanyId}</span>
           </p>
         </div>
       </footer>

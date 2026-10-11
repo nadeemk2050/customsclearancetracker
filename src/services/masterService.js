@@ -1,8 +1,7 @@
-// Master Data Management Service (Shipping Lines, Consignees, Shippers, Ports, Cargo, Depots)
-import { db, doc, setDoc, deleteDoc, collection, onSnapshot } from '../firebase/config';
+// Master Data Management Service (Offline-First Architecture)
+// Shipping Lines, Consignees, Shippers, Ports, Cargo, Depots
 
-export const CCT_MASTERS_COLLECTION = 'cct_masters';
-const LOCAL_MASTERS_KEY = 'cct_pro_masters_db';
+import { db, doc, getDoc, setDoc } from '../firebase/config';
 
 export const INITIAL_MASTERS = {
   shippingLines: [
@@ -61,10 +60,12 @@ export const INITIAL_MASTERS = {
   ]
 };
 
-// Load Masters from LocalStorage
-export const getLocalMasters = () => {
+const getMastersKey = (companyId = 'cha_al_mumtaz') => `cct_pro_masters_${companyId}`;
+
+// 1. OFFLINE-FIRST: Load Masters from local storage immediately
+export const getLocalMasters = (companyId = 'cha_al_mumtaz') => {
   try {
-    const raw = localStorage.getItem(LOCAL_MASTERS_KEY);
+    const raw = localStorage.getItem(getMastersKey(companyId));
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
@@ -77,59 +78,49 @@ export const getLocalMasters = () => {
   } catch (err) {
     console.warn('Error reading local masters:', err);
   }
-  saveLocalMasters(INITIAL_MASTERS);
+  saveLocalMasters(INITIAL_MASTERS, companyId);
   return INITIAL_MASTERS;
 };
 
-// Save Masters to LocalStorage
-export const saveLocalMasters = (masters) => {
+// 2. OFFLINE-FIRST: Save Masters to local PC storage immediately
+export const saveLocalMasters = (masters, companyId = 'cha_al_mumtaz') => {
   try {
-    localStorage.setItem(LOCAL_MASTERS_KEY, JSON.stringify(masters));
+    localStorage.setItem(getMastersKey(companyId), JSON.stringify(masters));
   } catch (err) {
     console.error('Failed writing masters to local storage:', err);
   }
 };
 
-// Live Firestore Listener for Masters with LocalStorage synchronization
-export const subscribeToMasters = (onData) => {
-  // Immediately provide cached masters
-  const local = getLocalMasters();
+// 3. OFFLINE-FIRST: Subscribe to Masters (loads local first, then pulls single remote snapshot)
+export const subscribeToMasters = (companyId = 'cha_al_mumtaz', onData) => {
+  // Emit local instantly
+  const local = getLocalMasters(companyId);
   onData(local);
 
-  try {
-    const docRef = doc(db, CCT_MASTERS_COLLECTION, 'global_masters');
-    const unsubscribe = onSnapshot(
-      docRef,
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const remoteData = docSnap.data();
-          const merged = { ...INITIAL_MASTERS, ...remoteData };
-          saveLocalMasters(merged);
-          onData(merged);
-        } else {
-          // Initialize remote document if not present
-          setDoc(docRef, INITIAL_MASTERS).catch(() => {});
-        }
-      },
-      (err) => {
-        console.warn('Masters sync note (running offline cache):', err);
-      }
-    );
-    return unsubscribe;
-  } catch (err) {
-    console.warn('Firestore masters fallback:', err);
-    return () => {};
-  }
+  // Background single read from Firestore (low quota consumption)
+  const docRef = doc(db, 'cct_masters_vaults', companyId);
+  getDoc(docRef).then((docSnap) => {
+    if (docSnap.exists()) {
+      const remoteData = docSnap.data();
+      const merged = { ...INITIAL_MASTERS, ...remoteData };
+      saveLocalMasters(merged, companyId);
+      onData(merged);
+    }
+  }).catch(() => {
+    // Offline mode is completely supported
+  });
+
+  return () => {};
 };
 
-// Update Masters state (both locally and Firestore)
-export const persistMasters = async (newMasters) => {
-  saveLocalMasters(newMasters);
+// 4. OFFLINE-FIRST: Persist Masters (Writes locally first, then single cloud write)
+export const persistMasters = async (newMasters, companyId = 'cha_al_mumtaz') => {
+  saveLocalMasters(newMasters, companyId);
   try {
-    const docRef = doc(db, CCT_MASTERS_COLLECTION, 'global_masters');
-    await setDoc(docRef, newMasters);
+    const docRef = doc(db, 'cct_masters_vaults', companyId);
+    await setDoc(docRef, { ...newMasters, updatedAt: new Date().toISOString() });
   } catch (err) {
-    console.warn('Could not sync masters to Firestore (persisted locally):', err);
+    console.warn('Offline-first: Saved masters locally, cloud sync pending:', err);
   }
   return newMasters;
 };
