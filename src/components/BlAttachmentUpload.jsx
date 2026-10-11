@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Upload, FileText, ImageIcon, Eye, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { uploadBlAttachment, deleteBlAttachment, formatFileSize } from '../services/attachmentService';
 import { formatDateTime } from '../utils/dateUtils';
+import { requestActionPassword } from '../utils/securityGate';
 
 /**
  * One BL attachment slot (BL Draft / Original BL).
@@ -29,6 +30,10 @@ export const BlAttachmentUpload = ({
     event.target.value = '';
     if (!file) return;
 
+    // Replacing removes the previously stored file, so it needs the same authorization
+    const previousPath = value?.path;
+    if (previousPath && !requestActionPassword(`replace the stored ${label}`)) return;
+
     setError('');
     setStatus('compressing');
     try {
@@ -43,7 +48,8 @@ export const BlAttachmentUpload = ({
         }
       });
       setStatus('uploading');
-      if (value?.path) await deleteBlAttachment(value.path);
+      // Only drop the old object once the new one is safely stored
+      if (previousPath) await deleteBlAttachment(previousPath);
       onChange(meta);
     } catch (err) {
       setError(err?.message || 'Upload failed. Please check your connection and try again.');
@@ -53,6 +59,8 @@ export const BlAttachmentUpload = ({
   };
 
   const handleRemove = async () => {
+    if (!requestActionPassword(`remove the stored ${label}`)) return;
+
     const path = value?.path;
     onChange(null);
     await deleteBlAttachment(path);

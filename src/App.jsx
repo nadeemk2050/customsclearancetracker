@@ -38,6 +38,7 @@ import { makeLive, stopSync, flushPending } from './sync/engine';
 import { subscribeSyncStatus } from './sync/status';
 import { calculateDetentionMetrics, calculateFleetRiskRadar } from './utils/detentionEngine';
 import { buildStatusLogEntry } from './utils/statusStages';
+import { requestActionPassword } from './utils/securityGate';
 
 export function App() {
   // Session State (Multi-Tenant Authentication)
@@ -216,19 +217,8 @@ export function App() {
     setIsModalOpen(true);
   };
 
-  const checkActionPassword = (actionName = 'proceed with this operation') => {
-    const pwd = window.prompt(`🔒 Security Verification:\nEnter authorization password to ${actionName}:`);
-    if (pwd === 'abcd') {
-      return true;
-    }
-    if (pwd !== null) {
-      alert('❌ Access Denied: Incorrect password. You must enter "abcd" to proceed.');
-    }
-    return false;
-  };
-
   const handleEditShipment = (shipment) => {
-    if (!checkActionPassword('edit this Bill of Lading (BL) shipment')) return;
+    if (!requestActionPassword('edit this Bill of Lading (BL) shipment')) return;
     setEditingShipment(shipment);
     setIsModalOpen(true);
   };
@@ -263,7 +253,7 @@ export function App() {
   };
 
   const handleDeleteShipment = async (id) => {
-    if (!checkActionPassword('permanently delete this Bill of Lading (BL) shipment')) return;
+    if (!requestActionPassword('permanently delete this Bill of Lading (BL) shipment')) return;
     if (window.confirm('⚠️ Are you sure you want to delete this Bill of Lading shipment record? This action cannot be undone.')) {
       const updated = await removeShipment(id, shipments, activeCompanyId);
       setShipments(updated);
@@ -279,7 +269,7 @@ export function App() {
   // questionnaire so each update is stamped with time and user.
   const handleQuickUpdateStatus = (shipment, newStatus) => {
     if (!shipment || shipment.customsStatus === newStatus) return;
-    if (!checkActionPassword(`update customs status to "${newStatus}"`)) return;
+    if (!requestActionPassword(`update customs status to "${newStatus}"`)) return;
     setStatusPrompt({
       shipment,
       newStatus,
@@ -293,7 +283,7 @@ export function App() {
   const handleQuickContainerReturn = (shipment, containerId, actionType) => {
     const container = (shipment.containers || []).find(c => c.id === containerId);
     const stageLabel = actionType === 'gateOut' ? 'Port Gate-Out' : 'Empties Returned';
-    if (!checkActionPassword(`update container status to "${stageLabel}"`)) return;
+    if (!requestActionPassword(`update container status to "${stageLabel}"`)) return;
     setStatusPrompt({
       shipment,
       newStatus: actionType === 'gateOut' ? 'Gate Out' : 'Empties Returned',

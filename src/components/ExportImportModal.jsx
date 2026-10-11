@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Download, Upload, FileSpreadsheet, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 import { exportToJsonFile, exportToCsvFile, INITIAL_CCT_DATA } from '../services/storageService';
+import { requestActionPassword } from '../utils/securityGate';
 
 export const ExportImportModal = ({ 
   isOpen, 
@@ -26,6 +27,8 @@ export const ExportImportModal = ({
         if (!Array.isArray(parsed)) {
           throw new Error('Imported JSON file must contain an array of shipment records.');
         }
+        // Restoring replaces every current record, so it needs the authorization password
+        if (!requestActionPassword('restore the database from this backup file (current records will be replaced)')) return;
         onRestoreData(parsed);
         setImportStatus(`Successfully restored ${parsed.length} shipment records!`);
       } catch (err) {
@@ -36,6 +39,7 @@ export const ExportImportModal = ({
   };
 
   const handleResetSampleData = () => {
+    if (!requestActionPassword('reset the database to the demonstration records (current records will be replaced)')) return;
     if (window.confirm('Reset database to the standard demonstration records?')) {
       onRestoreData(INITIAL_CCT_DATA);
       setImportStatus('Database reset to demonstration records.');

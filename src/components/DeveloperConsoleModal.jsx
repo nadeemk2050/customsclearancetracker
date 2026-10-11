@@ -29,6 +29,7 @@ import {
   devResetCompanyPassword,
   devSwitchActiveCompany
 } from '../services/authService';
+import { requestActionPassword } from '../utils/securityGate';
 
 export const DeveloperConsoleModal = ({ isOpen, onClose, currentSession, onSessionChange }) => {
   const [companies, setCompanies] = useState([]);
@@ -71,6 +72,7 @@ export const DeveloperConsoleModal = ({ isOpen, onClose, currentSession, onSessi
   };
 
   const handleDeleteCompany = async (companyId, companyName) => {
+    if (!requestActionPassword(`permanently delete company "${companyName}" and all of its data`)) return;
     if (window.confirm(`⚠️ DEVELOPER ACTION: Are you sure you want to PERMANENTLY DELETE company "${companyName}" and all its team members? This cannot be undone.`)) {
       setLoading(true);
       try {
@@ -86,6 +88,7 @@ export const DeveloperConsoleModal = ({ isOpen, onClose, currentSession, onSessi
   };
 
   const handleZeroAllCompanies = async () => {
+    if (!requestActionPassword('zero / delete ALL companies in the entire database')) return;
     const confirmation = window.prompt(
       '⚠️ CRITICAL DEVELOPER RESET ⚠️\n\nAre you sure you want to ZERO / DELETE ALL COMPANIES and all their team members from the entire database to start 100% from scratch?\n\nType "ZERO" in capital letters to confirm:'
     );
@@ -120,6 +123,7 @@ export const DeveloperConsoleModal = ({ isOpen, onClose, currentSession, onSessi
   };
 
   const handleDeleteMember = async (companyId, memberId, memberName) => {
+    if (!requestActionPassword(`remove team member "${memberName}"`)) return;
     if (window.confirm(`Developer Action: Remove team member "${memberName}"?`)) {
       try {
         await devDeleteTeamMember(companyId, memberId);

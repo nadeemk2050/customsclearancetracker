@@ -15,6 +15,7 @@ import {
   CheckCircle,
   Database
 } from 'lucide-react';
+import { requestActionPassword } from '../utils/securityGate';
 
 const TABS = [
   { key: 'shippingLines', label: 'Shipping Lines', icon: Ship },
@@ -69,6 +70,7 @@ export const ManageMastersModal = ({
   };
 
   const handleDelete = (id) => {
+    if (!requestActionPassword('delete this master record')) return;
     if (window.confirm('Are you sure you want to delete this master record?')) {
       const currentList = masters[activeTab] || [];
       const updatedList = currentList.filter(item => item.id !== id);

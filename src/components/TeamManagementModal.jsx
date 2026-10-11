@@ -20,6 +20,7 @@ import {
   saveCompanyTeamMember, 
   removeCompanyTeamMember 
 } from '../services/authService';
+import { requestActionPassword } from '../utils/securityGate';
 
 export const TeamManagementModal = ({ isOpen, onClose, currentSession }) => {
   const [teamMembers, setTeamMembers] = useState([]);
@@ -76,6 +77,7 @@ export const TeamManagementModal = ({ isOpen, onClose, currentSession }) => {
   };
 
   const handleDeleteClick = async (memberId, memberName) => {
+    if (!requestActionPassword(`remove team member "${memberName}"`)) return;
     if (window.confirm(`Are you sure you want to remove team member "${memberName}"?`)) {
       try {
         const updated = await removeCompanyTeamMember(companyId, memberId);
