@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "proformatracker"
+  },
+  "targets": {
+    "proformatracker": {
+      "hosting": {
+        "cct": [
+          "customsclearance-tracker"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,135 @@
+// Master Data Management Service (Shipping Lines, Consignees, Shippers, Ports, Cargo, Depots)
+import { db, doc, setDoc, deleteDoc, collection, onSnapshot } from '../firebase/config';
+
+export const CCT_MASTERS_COLLECTION = 'cct_masters';
+const LOCAL_MASTERS_KEY = 'cct_pro_masters_db';
+
+export const INITIAL_MASTERS = {
+  shippingLines: [
+    { id: 'sl_1', name: 'Hapag-Lloyd', scac: 'HLCU', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 85, contactEmail: 'imports@hapag-lloyd.com', phone: '+971 4 397 8888' },
+    { id: 'sl_2', name: 'Maersk Line', scac: 'MAEU', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 90, contactEmail: 'uaecs@maersk.com', phone: '+971 4 332 5000' },
+    { id: 'sl_3', name: 'MSC (Mediterranean Shipping Co)', scac: 'MSCU', defaultPortFreeDays: 7, defaultLineFreeDays: 21, defaultDetentionRate: 75, contactEmail: 'uae-info@msc.com', phone: '+971 4 381 2222' },
+    { id: 'sl_4', name: 'CMA CGM', scac: 'CMDU', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 80, contactEmail: 'dxb.customerservice@cma-cgm.com', phone: '+971 4 402 1000' },
+    { id: 'sl_5', name: 'COSCO Shipping', scac: 'COSU', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 70, contactEmail: 'import@cosco.ae', phone: '+971 4 393 8888' },
+    { id: 'sl_6', name: 'Ocean Network Express (ONE)', scac: 'ONEY', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 80, contactEmail: 'me.cs@one-line.com', phone: '+971 4 804 0000' },
+    { id: 'sl_7', name: 'Evergreen Marine', scac: 'EGLV', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 75, contactEmail: 'import@evergreen-shipping.ae', phone: '+971 4 359 5555' },
+    { id: 'sl_8', name: 'Yang Ming', scac: 'YMLU', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 75, contactEmail: 'dxb@yangming.com', phone: '+971 4 352 2220' },
+    { id: 'sl_9', name: 'HMM', scac: 'HMMU', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 80, contactEmail: 'uaecs@hmm21.com', phone: '+971 4 397 7770' },
+    { id: 'sl_10', name: 'ZIM Integrated Shipping', scac: 'ZIMU', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 85, contactEmail: 'cs@zim.com', phone: '+971 4 311 0000' },
+    { id: 'sl_11', name: 'Wan Hai Lines', scac: 'WHLC', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 70, contactEmail: 'dxb_cs@wanhai.com', phone: '+971 4 351 1111' }
+  ],
+
+  consignees: [
+    { id: 'con_1', name: 'MUMTAZ PLASTIC RECYCLING LLC', address: 'Plot 598-1120, Dubai Industrial City, Phase 2, Warehouse 4, Dubai, UAE', trn: '100294829100003', contactPerson: 'Mr. Mumtaz Ali', phone: '+971 50 123 4567', email: 'operations@mumtazplastic.com', destinationYard: 'Dubai Industrial City Yard, Warehouse 4' },
+    { id: 'con_2', name: 'AL-FALAH GENERAL TRADING EST', address: 'Al-Kharj Road, Industrial Area 2, Street 18, Riyadh, Saudi Arabia', trn: '300184920100003', contactPerson: 'Tariq Al-Mansoor', phone: '+966 55 987 6543', email: 'import@alfalahtrading.sa', destinationYard: 'Riyadh Dry Port CFS Warehouse' },
+    { id: 'con_3', name: 'EUROPEAN LOGISTICS HUB B.V.', address: 'Maasvlakte Rotterdam Port Distripark, Haven 9200, 3199 LK Rotterdam, Netherlands', trn: 'NL884910284B01', contactPerson: 'Jan De Vries', phone: '+31 10 789 0123', email: 'customs@eurohublogistics.nl', destinationYard: 'Rotterdam Distripark Warehouse' },
+    { id: 'con_4', name: 'HINDUSTAN INDUSTRIAL FASTENERS PVT', address: 'Plot 44, Okhla Industrial Area Phase III, New Delhi 110020, India', trn: '07AAACH1234F1Z5', contactPerson: 'Rajesh Sharma', phone: '+91 98112 34567', email: 'imports@hindustanfasteners.in', destinationYard: 'Patparganj ICD Delhi Yard' }
+  ],
+
+  shippers: [
+    { id: 'shp_1', name: 'POLYMER GLOBAL GMBH', country: 'Germany', address: 'Willy-Brandt-Strasse 45, 20457 Hamburg, Germany', contactPerson: 'Klaus Fischer', phone: '+49 40 3344 5566', email: 'exports@polymer-global.de' },
+    { id: 'shp_2', name: 'SHANGHAI ELECTRO-TECH CORP', country: 'China', address: 'No. 888 Pudong South Road, Pudong New Area, Shanghai 200120, China', contactPerson: 'Chen Wei', phone: '+86 21 6888 9900', email: 'sales@shanghaielectro.cn' },
+    { id: 'shp_3', name: 'ASEAN RUBBER EXPORTS PTE', country: 'Singapore / Malaysia', address: '10 Anson Road, #21-08 International Plaza, Singapore 079903', contactPerson: 'Tan Boon Kiat', phone: '+65 6222 3344', email: 'shipping@aseanrubber.sg' },
+    { id: 'shp_4', name: 'SHANDONG METALS CO LTD', country: 'China', address: 'No. 126 Yan’an 3rd Road, Shinan District, Qingdao 266071, China', contactPerson: 'Liu Jin', phone: '+86 532 8585 1234', email: 'export@shandongmetals.cn' }
+  ],
+
+  ports: [
+    { id: 'prt_1', name: 'Jebel Ali Port (AEJEA)', code: 'AEJEA', country: 'UAE', terminal: 'DP World Terminal 1 / 2 / 3 / 4', defaultPortFreeDays: 5, defaultPortDailyRate: 45 },
+    { id: 'prt_2', name: 'Port of Rotterdam (NLRTM)', code: 'NLRTM', country: 'Netherlands', terminal: 'ECT Delta / RWG Maasvlakte', defaultPortFreeDays: 5, defaultPortDailyRate: 60 },
+    { id: 'prt_3', name: 'Nhava Sheva JNPT (INNSA)', code: 'INNSA', country: 'India', terminal: 'JNPCT / NSICT / GTI / BMCT', defaultPortFreeDays: 5, defaultPortDailyRate: 40 },
+    { id: 'prt_4', name: 'King Abdulaziz Port Dammam (SADMM)', code: 'SADMM', country: 'Saudi Arabia', terminal: 'Saudi Global Ports (SGP)', defaultPortFreeDays: 7, defaultPortDailyRate: 45 },
+    { id: 'prt_5', name: 'Shanghai Port (CNSHA)', code: 'CNSHA', country: 'China', terminal: 'Yangshan Deepwater Port', defaultPortFreeDays: 7, defaultPortDailyRate: 50 },
+    { id: 'prt_6', name: 'Hamburg Port (DEHAM)', code: 'DEHAM', country: 'Germany', terminal: 'HHLA Container Terminal Burchardkai', defaultPortFreeDays: 5, defaultPortDailyRate: 55 },
+    { id: 'prt_7', name: 'Singapore Port (SGSIN)', code: 'SGSIN', country: 'Singapore', terminal: 'PSA Pasir Panjang / Tuas Port', defaultPortFreeDays: 5, defaultPortDailyRate: 50 },
+    { id: 'prt_8', name: 'Port of Los Angeles (USLAX)', code: 'USLAX', country: 'USA', terminal: 'Pier 400 / APM Terminals', defaultPortFreeDays: 4, defaultPortDailyRate: 120 }
+  ],
+
+  cargoDescriptions: [
+    { id: 'crg_1', description: 'POST INDUSTRIAL RECYCLED POLYPROPYLENE GRANULES', defaultHsCode: '3902.10.00', defaultDutyPercent: 5, defaultPackaging: 'Bags / Pallets' },
+    { id: 'crg_2', description: 'PRECISION AIR CONDITIONING SPARE COMPRESSORS', defaultHsCode: '8414.30.00', defaultDutyPercent: 5, defaultPackaging: 'Wooden Crates' },
+    { id: 'crg_3', description: 'NATURAL RUBBER SHEETS TSR20', defaultHsCode: '4001.22.00', defaultDutyPercent: 0, defaultPackaging: 'Bales' },
+    { id: 'crg_4', description: 'STAINLESS STEEL FASTENERS & BOLTS', defaultHsCode: '7318.15.00', defaultDutyPercent: 7.5, defaultPackaging: 'Cartons' },
+    { id: 'crg_5', description: 'CERAMIC TILES GLAZED PORCELAIN', defaultHsCode: '6907.21.00', defaultDutyPercent: 5, defaultPackaging: 'Boxes / Pallets' },
+    { id: 'crg_6', description: 'PHOTOVOLTAIC SOLAR CELL PANELS', defaultHsCode: '8541.43.00', defaultDutyPercent: 0, defaultPackaging: 'Pallets' }
+  ],
+
+  depots: [
+    { id: 'dpt_1', name: 'Hapag-Lloyd Inland Depot 4', shippingLine: 'Hapag-Lloyd', location: 'Dubai Industrial City, Yard 4', workingHours: '08:00 - 20:00' },
+    { id: 'dpt_2', name: 'Maersk Maasvlakte Depot', shippingLine: 'Maersk Line', location: 'Maasvlakte 2 Haven 9100', workingHours: '24 Hours' },
+    { id: 'dpt_3', name: 'MSC Al-Khafji Logistics Depot', shippingLine: 'MSC', location: 'Dammam Industrial Port Road', workingHours: '07:00 - 19:00' },
+    { id: 'dpt_4', name: 'COSCO Concor Yard Nhava Sheva', shippingLine: 'COSCO Shipping', location: 'JNPT Dronagiri CFS Hub', workingHours: '24 Hours' }
+  ]
+};
+
+// Load Masters from LocalStorage
+export const getLocalMasters = () => {
+  try {
+    const raw = localStorage.getItem(LOCAL_MASTERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          ...INITIAL_MASTERS,
+          ...parsed
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Error reading local masters:', err);
+  }
+  saveLocalMasters(INITIAL_MASTERS);
+  return INITIAL_MASTERS;
+};
+
+// Save Masters to LocalStorage
+export const saveLocalMasters = (masters) => {
+  try {
+    localStorage.setItem(LOCAL_MASTERS_KEY, JSON.stringify(masters));
+  } catch (err) {
+    console.error('Failed writing masters to local storage:', err);
+  }
+};
+
+// Live Firestore Listener for Masters with LocalStorage synchronization
+export const subscribeToMasters = (onData) => {
+  // Immediately provide cached masters
+  const local = getLocalMasters();
+  onData(local);
+
+  try {
+    const docRef = doc(db, CCT_MASTERS_COLLECTION, 'global_masters');
+    const unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const remoteData = docSnap.data();
+          const merged = { ...INITIAL_MASTERS, ...remoteData };
+          saveLocalMasters(merged);
+          onData(merged);
+        } else {
+          // Initialize remote document if not present
+          setDoc(docRef, INITIAL_MASTERS).catch(() => {});
+        }
+      },
+      (err) => {
+        console.warn('Masters sync note (running offline cache):', err);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('Firestore masters fallback:', err);
+    return () => {};
+  }
+};
+
+// Update Masters state (both locally and Firestore)
+export const persistMasters = async (newMasters) => {
+  saveLocalMasters(newMasters);
+  try {
+    const docRef = doc(db, CCT_MASTERS_COLLECTION, 'global_masters');
+    await setDoc(docRef, newMasters);
+  } catch (err) {
+    console.warn('Could not sync masters to Firestore (persisted locally):', err);
+  }
+  return newMasters;
+};
