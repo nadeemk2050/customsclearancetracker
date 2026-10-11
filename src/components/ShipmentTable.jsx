@@ -110,17 +110,6 @@ export const ShipmentTable = ({
 
   return (
     <div className="table-card">
-      <div className="table-header-bar">
-        <div className="flex items-center gap-3">
-          <h2 className="text-base font-bold text-slate-800">
-            Active Customs Dossiers & BL Shipments
-          </h2>
-          <span className="text-xs bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-bold">
-            {shipments.length} Records
-          </span>
-        </div>
-      </div>
-
       <div className="table-responsive">
         <table className="data-table">
           <thead>

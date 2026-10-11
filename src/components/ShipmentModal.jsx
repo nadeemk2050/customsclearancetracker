@@ -22,6 +22,8 @@ import {
   Coins
 } from 'lucide-react';
 import { addDays, formatDate, formatCurrency } from '../utils/dateUtils';
+import { BlAttachmentUpload } from './BlAttachmentUpload';
+import { BL_ATTACHMENT_SLOTS } from '../services/attachmentService';
 
 const DEFAULT_CONTAINER = {
   id: '',
@@ -85,6 +87,10 @@ const DEFAULT_SHIPMENT = {
     portGatePass: false,
     emptyReturnEIR: false
   },
+  blDocuments: {
+    blDraft: null,
+    originalBL: null
+  },
   containers: [{ ...DEFAULT_CONTAINER, id: 'c_' + Date.now() }]
 };
 
@@ -101,7 +107,9 @@ export const ShipmentModal = ({
   onClose, 
   shipmentToEdit, 
   onSave,
-  masters = {}
+  masters = {},
+  companyId = 'default',
+  currentUser = null
 }) => {
   const [formData, setFormData] = useState(DEFAULT_SHIPMENT);
   const [activeTab, setActiveTab] = useState('general');
@@ -127,6 +135,10 @@ export const ShipmentModal = ({
           ...DEFAULT_SHIPMENT.documents,
           ...(shipmentToEdit.documents || {})
         },
+        blDocuments: {
+          ...DEFAULT_SHIPMENT.blDocuments,
+          ...(shipmentToEdit.blDocuments || {})
+        },
         containers: shipmentToEdit.containers && shipmentToEdit.containers.length > 0
           ? shipmentToEdit.containers
           : [{ ...DEFAULT_CONTAINER, id: 'c_' + Date.now() }]
@@ -134,6 +146,8 @@ export const ShipmentModal = ({
     } else {
       setFormData({
         ...DEFAULT_SHIPMENT,
+        // Stable id up front so BL attachments can be stored before the first save
+        id: 'CCT-' + Date.now(),
         containers: [{ ...DEFAULT_CONTAINER, id: 'c_' + Date.now() }]
       });
     }
@@ -211,6 +225,16 @@ export const ShipmentModal = ({
       documents: {
         ...prev.documents,
         [docKey]: !prev.documents[docKey]
+      }
+    }));
+  };
+
+  const handleBlAttachmentChange = (slotKey, attachment) => {
+    setFormData(prev => ({
+      ...prev,
+      blDocuments: {
+        ...(prev.blDocuments || {}),
+        [slotKey]: attachment
       }
     }));
   };
@@ -302,7 +326,7 @@ export const ShipmentModal = ({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-0.01em' }}>
-                  {shipmentToEdit ? `Edit Shipment Dossier — ${shipmentToEdit.blNo}` : 'Add New BL Consignment Details'}
+                  {shipmentToEdit ? `Edit BLs Consignment — ${shipmentToEdit.blNo}` : 'Add New BL Consignment Details'}
                 </h2>
                 <span className="brand-badge">Full Suite</span>
               </div>
@@ -1047,6 +1071,32 @@ export const ShipmentModal = ({
           {/* TAB 5: DOCUMENT AUDIT CHECKLIST */}
           {activeTab === 'documents' && (
             <div>
+              {/* BL Consignment Attachments: BL Draft + Original BL */}
+              <div style={{ marginBottom: '1.75rem' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  BL Consignment Attachments
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0.9rem' }}>
+                  Attach the BL draft, the original BL, or both. Images (JPG, PNG, WebP) and PDF files are accepted and
+                  automatically compressed to under 150 KB before being uploaded to Firebase Storage.
+                </p>
+                <div className="bl-attach-grid">
+                  {BL_ATTACHMENT_SLOTS.map(({ key, label, hint }) => (
+                    <BlAttachmentUpload
+                      key={key}
+                      slot={key}
+                      label={label}
+                      hint={hint}
+                      value={formData.blDocuments?.[key] || null}
+                      companyId={companyId}
+                      shipmentId={formData.id}
+                      user={currentUser}
+                      onChange={(attachment) => handleBlAttachmentChange(key, attachment)}
+                    />
+                  ))}
+                </div>
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>

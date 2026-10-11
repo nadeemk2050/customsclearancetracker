@@ -61,19 +61,37 @@
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-*, *::before, *::after {
+/* Box sizing only: the margin/padding reset is owned by Tailwind's preflight
+   (base layer), so utility classes such as p-4 / mt-2 can still win. */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
-body {
-  font-family: var(--font-sans);
-  background-color: var(--bg-app);
-  color: var(--text-primary);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
+/* Element-level defaults live in Tailwind's `base` layer so that utility
+   classes on the same element (e.g. text-white on an h2) can still win. */
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  button, input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+  }
 }
 
 #root {
@@ -81,19 +99,6 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-/* Typography Helpers */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-}
-
-button, input, select, textarea {
-  font-family: inherit;
-  font-size: inherit;
 }
 
 /* Scrollbars */
@@ -220,87 +225,16 @@ button, input, select, textarea {
   box-shadow: 0 0 15px rgba(37, 99, 235, 0.2);
 }
 
-/* Loss Prevention Banner / Radar */
-.prevention-banner {
-  background: linear-gradient(90deg, #111827 0%, #1e1b4b 50%, #0f172a 100%);
-  color: #fff;
-  padding: 0.75rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 0.85rem;
-}
-
-.banner-content {
-  max-width: 1600px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.radar-indicator {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.pulse-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background-color: #ef4444;
-  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-  animation: pulse-ring 2s infinite;
-}
-
-@keyframes pulse-ring {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-
-.radar-pill-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.radar-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.radar-pill.danger {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.4);
-}
-
-.radar-pill.warning {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fde68a;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-}
-
-.radar-pill.success {
-  background: rgba(16, 185, 129, 0.2);
-  color: #86efac;
-  border: 1px solid rgba(16, 185, 129, 0.4);
-}
-
 /* Ultra-Compact KPI Strip (Maximizes Main Screen Space) */
 .kpi-strip-bar {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 8px;
-  margin: 8px 0 12px 0;
+  /* Flush against the navbar above and the filter bar below */
+  margin: 0;
+  padding: 0;
+  background: #eff7ff;
+  border-bottom: 1px solid #bcd9f7;
 }
 
 @media (max-width: 1024px) {
@@ -310,15 +244,16 @@ button, input, select, textarea {
 }
 
 .kpi-chip {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  /* Light blue tiles so the KPI strip reads as its own band above the list */
+  background: linear-gradient(180deg, #f5faff 0%, #e2efff 100%);
+  border: 1px solid #bcd9f7;
   border-radius: var(--radius-md);
   padding: 6px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
   position: relative;
   overflow: hidden;
   transition: all var(--transition-fast);
@@ -328,8 +263,8 @@ button, input, select, textarea {
 
 .kpi-chip:hover {
   transform: translateY(-1px);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
+  border-color: #93c5fd;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.16);
 }
 
 .chip-accent {
@@ -349,10 +284,14 @@ button, input, select, textarea {
 .chip-label {
   font-size: 0.6875rem;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: #2c5c8f;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   white-space: nowrap;
+  /* Long master names must ellipsize rather than overlap the chip value */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chip-value {
@@ -402,17 +341,20 @@ button, input, select, textarea {
 /* Filter & Control Bar */
 .control-panel {
   background: var(--surface);
+  /* Flush between the KPI strip above and the list below: no gaps, square corners */
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem;
-  box-shadow: var(--shadow-sm);
-  margin-bottom: 1.5rem;
+  border-top: none;
+  border-bottom: none;
+  border-radius: 0;
+  padding: 0.7rem 0.9rem;
+  box-shadow: none;
+  margin-bottom: 0;
 }
 
 .search-filter-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.7rem;
   flex-wrap: wrap;
 }
 
@@ -470,50 +412,52 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 1rem;
-  padding-top: 0.85rem;
+  margin-top: 0.55rem;
+  padding-top: 0.5rem;
   border-top: 1px solid var(--border-subtle);
   overflow-x: auto;
   white-space: nowrap;
 }
 
 .preset-pill {
-  padding: 5px 12px;
-  border-radius: 999px;
-  font-size: 0.775rem;
+  height: 20px;
+  padding: 0 9px;
+  border-radius: 5px;
+  font-size: 0.6875rem;
+  line-height: 1;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--surface-subtle);
-  border: 1px solid var(--border);
+  color: #7c5c12;
+  background: linear-gradient(180deg, #fffdf5 0%, #fbf3de 100%);
+  /* Golden edge so the filter bar reads differently from the list below */
+  border: 1px solid #d9b45b;
+  box-shadow: 0 1px 2px rgba(180, 140, 40, 0.14);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  flex-shrink: 0;
   transition: all var(--transition-fast);
 }
 
 .preset-pill:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
+  background: #fdf4dc;
+  border-color: #c69a3a;
+  color: #6b4f0f;
 }
 
 .preset-pill.active {
-  background: #eff6ff;
-  color: var(--blue-700);
-  border-color: #93c5fd;
+  background: linear-gradient(180deg, #f8da7c 0%, #edc04a 100%);
+  color: #453203;
+  border-color: #b5891f;
+  box-shadow: 0 0 0 3px rgba(238, 193, 74, 0.28);
   font-weight: 700;
 }
 
-.preset-pill.danger.active {
-  background: #fef2f2;
-  color: #dc2626;
-  border-color: #fca5a5;
-}
-
+.preset-pill.danger.active,
 .preset-pill.warning.active {
-  background: #fffbeb;
-  color: #d97706;
-  border-color: #fde68a;
+  background: linear-gradient(180deg, #f8da7c 0%, #edc04a 100%);
+  color: #453203;
+  border-color: #b5891f;
 }
 
 /* Buttons */
@@ -585,19 +529,11 @@ button, input, select, textarea {
 .table-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  /* Square top so the list continues straight out of the filter bar */
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
   margin-bottom: 2rem;
-}
-
-.table-header-bar {
-  padding: 1rem 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border);
-  background: #fafbfc;
 }
 
 .table-responsive {
@@ -851,6 +787,158 @@ button, input, select, textarea {
   text-transform: uppercase;
 }
 
+/* Status Update Audit Stamp */
+.status-stamp {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--emerald-50);
+  border: 1px solid var(--emerald-200);
+  color: #065f46;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.status-stamp span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-stamp-note {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0.6rem 0 1.25rem;
+}
+
+/* BL Attachment Upload (BL Draft / Original BL) */
+.bl-attach-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .bl-attach-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bl-attach-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0.9rem 1rem;
+}
+
+.bl-attach-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bl-attach-head strong {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.bl-attach-head span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.bl-attach-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--blue-700);
+  margin-top: 0.7rem;
+}
+
+.bl-attach-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--rose-700);
+  background: var(--rose-50);
+  border: 1px solid var(--rose-200);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  margin-top: 0.7rem;
+}
+
+.bl-attach-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 0.7rem;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--emerald-50);
+  border: 1px solid var(--emerald-200);
+}
+
+.bl-attach-file strong {
+  display: block;
+  font-size: 0.78rem;
+  color: #065f46;
+  word-break: break-word;
+}
+
+.bl-attach-file small {
+  display: block;
+  font-size: 0.68rem;
+  color: #047857;
+  margin-top: 1px;
+}
+
+.bl-attach-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.bl-attach-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--blue-700);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  background: #ffffff;
+}
+
+.bl-attach-link:hover {
+  border-color: var(--blue-600);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
 /* Milestone Progression Timeline */
 .milestone-stepper {
   display: flex;
@@ -999,7 +1087,7 @@ button, input, select, textarea {
 
 /* Print Styling */
 @media print {
-  .navbar, .prevention-banner, .control-panel, .btn, .no-print {
+  .navbar, .control-panel, .btn, .no-print {
     display: none !important;
   }
   body {
@@ -1067,6 +1155,9 @@ button, input, select, textarea {
   top: calc(100% + 10px);
   left: 0;
   width: 300px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: #091224;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 14px;
@@ -1075,6 +1166,24 @@ button, input, select, textarea {
   z-index: 1000;
   backdrop-filter: blur(24px);
   animation: menu-dropdown-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Dark, slim scrollbar for the long menu list */
+.menu-dropdown-box::-webkit-scrollbar {
+  width: 6px;
+}
+
+.menu-dropdown-box::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.menu-dropdown-box::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 3px;
+}
+
+.menu-dropdown-box::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
 }
 
 @keyframes menu-dropdown-in {
@@ -1089,8 +1198,8 @@ button, input, select, textarea {
 }
 
 .menu-header-label {
-  padding: 8px 12px 6px;
-  font-size: 0.68rem;
+  padding: 7px 10px 5px;
+  font-size: 0.6rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1101,9 +1210,9 @@ button, input, select, textarea {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 9px;
   background: transparent;
   border: 1px solid transparent;
   color: #e2e8f0;
@@ -1133,9 +1242,9 @@ button, input, select, textarea {
 }
 
 .menu-icon-square {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
   background: rgba(37, 99, 235, 0.25);
   color: #60a5fa;
   display: flex;
@@ -1146,12 +1255,14 @@ button, input, select, textarea {
 
 .menu-item-title {
   font-weight: 700;
-  font-size: 0.825rem;
+  font-size: 0.75rem;
+  line-height: 1.25;
   color: #ffffff;
 }
 
 .menu-item-sub {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
+  line-height: 1.3;
   color: #94a3b8;
   margin-top: 1px;
 }

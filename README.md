@@ -4,6 +4,47 @@ CustomsTrack Pro is engineered with a **Local-First (Offline-First)** architectu
 
 ---
 
+## Styling System
+
+The UI is built from two cooperating layers:
+
+- **`src/index.css`** — the hand-written design system (color/spacing tokens, `.btn-*`, `.data-table`, `.modal-box`, `.kpi-chip`, `.dossier-*`, …). Its rules are **unlayered**, so a class-based component style always wins over a utility class applied to the same element.
+- **`src/tailwind.css`** + `@tailwindcss/vite` — Tailwind v4, the utility engine used by the views authored with utility classes (Loss Prevention Radar, Public Tracking Portal, Dossier drawer, shipment table and modals).
+
+Rules to keep in mind when editing styles:
+
+1. Element defaults (`body`, `h1`–`h6`, form controls) live in `@layer base`, so a utility such as `text-white` on an `h2` still wins.
+2. The global margin/padding reset is owned by Tailwind's preflight, not by `index.css` — that is what allows utilities such as `p-6` / `mt-2` to take effect.
+3. `src/tailwind.css` is imported **before** `index.css` in `src/main.jsx`, which establishes the layer order `theme → base → components → utilities`.
+
+---
+
+## BL Consignment Attachments
+
+The **Documents** step of the BL dossier carries two upload slots — **BL Draft** and **Original BL** (either
+one or both). Images (JPG/PNG/WebP) and PDF documents are accepted.
+
+- **Compression** (`src/utils/fileCompression.js`) runs in the browser before anything leaves the device and
+  targets a hard ceiling of **150 KB per file**. Images are re-encoded through the canvas API — the longest edge
+  stays between 800 px and 1600 px and JPEG quality is searched from 0.82 down to 0.45, so quality is reduced only
+  as far as the size budget requires. PDFs already under the ceiling are uploaded untouched; larger PDFs are
+  rasterised page by page (width ladder adapted to the page count) and rebuilt as a JPEG based PDF until the
+  result fits.
+- **Storage layout**: `bl_documents/{companyId}/{shipmentId}/{slot}_{timestamp}.{ext}` in Firebase Storage,
+  guarded by `storage.rules` (images/PDFs only, ≤ 150 KB per object).
+- The attachment metadata (`name`, `size`, `originalSize`, `pages`, `url`, `path`, `uploadedBy`, `uploadedAt`) is
+  saved on the shipment document as `blDocuments.blDraft` / `blDocuments.originalBL`, and is shown in the BL
+  dossier front area (image thumbnail or PDF icon, size, who uploaded it, and a *View* link).
+- `pdfjs-dist` and `jspdf` are imported on demand, so they stay out of the main bundle.
+
+Deploy the storage rules whenever they change:
+
+```bash
+firebase deploy --only storage
+```
+
+---
+
 ## Sync Engine — How It Works
 
 ### Architecture Components

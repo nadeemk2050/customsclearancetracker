@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // BL consignment attachments (BL draft / Original BL).
+    // Only images or PDFs are accepted and the hard cap is 150 KB, matching the
+    // client-side compression in src/utils/fileCompression.js.
+    match /bl_documents/{companyId}/{shipmentId}/{fileName} {
+      allow read: if true;
+      allow create, update: if request.resource.size <= 153600
+                            && (request.resource.contentType.matches('image/.*')
+                                || request.resource.contentType == 'application/pdf');
+      allow delete: if true;
+    }
+
+    // Nothing else is publicly writable.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

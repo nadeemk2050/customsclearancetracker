@@ -109,7 +109,7 @@ export const Navbar = ({
                     <Layers size={17} />
                   </div>
                   <div>
-                    <div className="menu-item-title" style={{ color: currentView === 'dashboard' ? '#38bdf8' : '#f8fafc' }}>Operations Command</div>
+                    <div className="menu-item-title" style={{ color: currentView === 'dashboard' ? '#38bdf8' : '#f8fafc' }}>Operations Tracking</div>
                     <div className="menu-item-sub">Active BL shipments & dossiers</div>
                   </div>
                 </button>
@@ -354,7 +354,7 @@ export const Navbar = ({
             className={`nav-tab-btn ${currentView === 'dashboard' ? 'active' : ''}`}
           >
             <Layers size={16} />
-            <span>Operations Command</span>
+            <span>Operations Tracking</span>
           </button>
 
 

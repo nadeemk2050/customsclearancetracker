@@ -3,7 +3,6 @@ import { Navbar } from './components/Navbar';
 import { LoginPage } from './components/LoginPage';
 import { TeamManagementModal } from './components/TeamManagementModal';
 import { DeveloperConsoleModal } from './components/DeveloperConsoleModal';
-import { LossPreventionBanner } from './components/LossPreventionBanner';
 import { KpiMetrics } from './components/KpiMetrics';
 import { FilterToolbar } from './components/FilterToolbar';
 import { ShipmentTable } from './components/ShipmentTable';
@@ -11,6 +10,7 @@ import { ShipmentModal } from './components/ShipmentModal';
 import { DossierDrawer } from './components/DossierDrawer';
 import { CustomerPortal } from './components/CustomerPortal';
 import { ExportImportModal } from './components/ExportImportModal';
+import { StatusUpdateModal } from './components/StatusUpdateModal';
 import { LossPreventionRadarView } from './components/LossPreventionRadarView';
 import { AllBlMasterView } from './components/AllBlMasterView';
 import { ManageMastersModal } from './components/ManageMastersModal';
@@ -37,6 +37,7 @@ import {
 import { makeLive, stopSync, flushPending } from './sync/engine';
 import { subscribeSyncStatus } from './sync/status';
 import { calculateDetentionMetrics, calculateFleetRiskRadar } from './utils/detentionEngine';
+import { buildStatusLogEntry } from './utils/statusStages';
 
 export function App() {
   // Session State (Multi-Tenant Authentication)
@@ -44,7 +45,8 @@ export function App() {
 
   // Application Data State
   const [shipments, setShipments] = useState([]);
-  const [currentView, setCurrentView] = useState('dashboard'); // dashboard | radar | portal
+  // All BLs Consignments Tracking is the app's main landing page
+  const [currentView, setCurrentView] = useState('bl-master'); // bl-master | dashboard | radar | portal
   const [syncStatus, setSyncStatus] = useState({ status: 'connected', metrics: { queueDepth: 0 } });
 
   // Master Data State
@@ -66,6 +68,8 @@ export function App() {
   const [dossierShipment, setDossierShipment] = useState(null);
   const [isDossierOpen, setIsDossierOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  // Pending status change waiting for the audit questionnaire
+  const [statusPrompt, setStatusPrompt] = useState(null);
 
   const activeCompanyId = session?.companyId || 'cha_al_mumtaz';
 
@@ -235,11 +239,26 @@ export function App() {
   };
 
   const handleSaveShipment = async (formData) => {
-    const updated = await persistShipment(formData, shipments, activeCompanyId);
+    const previous = shipments.find(s => s.id === formData.id);
+    const statusChanged = !!previous && previous.customsStatus !== formData.customsStatus;
+
+    // Hold the new status back until the audit questionnaire has been answered
+    const payload = statusChanged ? { ...formData, customsStatus: previous.customsStatus } : formData;
+    const updated = await persistShipment(payload, shipments, activeCompanyId);
     setShipments(updated);
     setSyncStatus({ pending: true });
-    if (dossierShipment && dossierShipment.id === formData.id) {
-      setDossierShipment(formData);
+    if (dossierShipment && dossierShipment.id === payload.id) {
+      setDossierShipment(payload);
+    }
+    if (statusChanged) {
+      setStatusPrompt({
+        shipment: payload,
+        newStatus: formData.customsStatus,
+        containerId: null,
+        actionType: null,
+        containerNo: null,
+        requestedAt: new Date().toISOString()
+      });
     }
   };
 
@@ -255,58 +274,86 @@ export function App() {
     }
   };
 
-  const handleQuickUpdateStatus = async (shipment, newStatus) => {
+  // Every status change (table dropdown, fast-forward button, dossier stepper or edit
+  // form) requires the "abcd" authorization password and then opens the stage
+  // questionnaire so each update is stamped with time and user.
+  const handleQuickUpdateStatus = (shipment, newStatus) => {
+    if (!shipment || shipment.customsStatus === newStatus) return;
     if (!checkActionPassword(`update customs status to "${newStatus}"`)) return;
-    const updated = {
-      ...shipment,
-      customsStatus: newStatus,
-      updatedAt: new Date().toISOString()
-    };
-    const newList = await persistShipment(updated, shipments, activeCompanyId);
-    setShipments(newList);
-    setSyncStatus({ pending: true });
-    if (dossierShipment && dossierShipment.id === shipment.id) {
-      setDossierShipment(updated);
-    }
+    setStatusPrompt({
+      shipment,
+      newStatus,
+      containerId: null,
+      actionType: null,
+      containerNo: null,
+      requestedAt: new Date().toISOString()
+    });
   };
 
-  const handleQuickContainerReturn = async (shipment, containerId, actionType) => {
-    if (!checkActionPassword('update container tracking status')) return;
-    const today = new Date().toISOString().split('T')[0];
-    const updatedContainers = (shipment.containers || []).map(c => {
-      if (c.id === containerId) {
+  const handleQuickContainerReturn = (shipment, containerId, actionType) => {
+    const container = (shipment.containers || []).find(c => c.id === containerId);
+    const stageLabel = actionType === 'gateOut' ? 'Port Gate-Out' : 'Empties Returned';
+    if (!checkActionPassword(`update container status to "${stageLabel}"`)) return;
+    setStatusPrompt({
+      shipment,
+      newStatus: actionType === 'gateOut' ? 'Gate Out' : 'Empties Returned',
+      containerId,
+      actionType,
+      containerNo: container?.containerNo || '',
+      requestedAt: new Date().toISOString()
+    });
+  };
+
+  const handleConfirmStatusUpdate = async (answers) => {
+    if (!statusPrompt) return;
+
+    const { newStatus, containerId, actionType, containerNo } = statusPrompt;
+    const current = shipments.find(s => s.id === statusPrompt.shipment.id) || statusPrompt.shipment;
+    const logEntry = buildStatusLogEntry({ status: newStatus, answers, session, containerNo: containerNo || null });
+
+    let updatedShipment = {
+      ...current,
+      updatedAt: logEntry.at,
+      updatedBy: logEntry.by,
+      statusHistory: [...(current.statusHistory || []), logEntry]
+    };
+
+    if (containerId && actionType) {
+      const today = new Date().toISOString().split('T')[0];
+      const updatedContainers = (current.containers || []).map(c => {
+        if (c.id !== containerId) return c;
         if (actionType === 'gateOut') {
           return {
             ...c,
             gateOutDate: today,
             status: 'Gate Out (In Transit)'
           };
-        } else if (actionType === 'emptyReturned') {
-          return {
-            ...c,
-            emptyReturnDate: today,
-            eirNumber: c.eirNumber || `EIR-${Math.floor(100000 + Math.random() * 900000)}`,
-            status: 'Empty Returned (Safe)'
-          };
         }
-      }
-      return c;
-    });
+        return {
+          ...c,
+          emptyReturnDate: today,
+          eirNumber: c.eirNumber || `EIR-${Math.floor(100000 + Math.random() * 900000)}`,
+          status: 'Empty Returned (Safe)'
+        };
+      });
 
-    const allReturned = updatedContainers.every(c => !!c.emptyReturnDate);
-    const updatedShipment = {
-      ...shipment,
-      containers: updatedContainers,
-      customsStatus: allReturned ? 'Empties Returned' : shipment.customsStatus,
-      updatedAt: new Date().toISOString()
-    };
+      const allReturned = updatedContainers.every(c => !!c.emptyReturnDate);
+      updatedShipment = {
+        ...updatedShipment,
+        containers: updatedContainers,
+        customsStatus: allReturned ? 'Empties Returned' : current.customsStatus
+      };
+    } else {
+      updatedShipment = { ...updatedShipment, customsStatus: newStatus };
+    }
 
     const newList = await persistShipment(updatedShipment, shipments, activeCompanyId);
     setShipments(newList);
     setSyncStatus({ pending: true });
-    if (dossierShipment && dossierShipment.id === shipment.id) {
+    if (dossierShipment && dossierShipment.id === updatedShipment.id) {
       setDossierShipment(updatedShipment);
     }
+    setStatusPrompt(null);
   };
 
   const handleResetFilters = () => {
@@ -353,19 +400,10 @@ export function App() {
         totalShipments={shipments.length}
       />
 
-      {/* 2. Loss Prevention Active Radar Banner */}
-      <LossPreventionBanner
-        fleetMetrics={fleetMetrics}
-        onFilterUrgent={() => {
-          setCurrentView('dashboard');
-          setActivePreset('urgent');
-        }}
-      />
-
-      {/* 3. Main Views */}
-      <main className="flex-1 pb-16">
+      {/* 2. Main Views */}
+      <main className={currentView === 'bl-master' ? 'flex-1 min-h-0 flex flex-col' : 'flex-1 pb-16'}>
         {currentView === 'dashboard' && (
-          <div className="app-container pt-4">
+          <div className="app-container">
             {/* KPI Cards */}
             <KpiMetrics
               fleetMetrics={fleetMetrics}
@@ -402,17 +440,11 @@ export function App() {
         )}
 
         {currentView === 'bl-master' && (
-          <div className="app-container pt-4">
-            <AllBlMasterView
-              shipments={shipments}
-              onViewDossier={handleViewDossier}
-              onEditShipment={handleEditShipment}
-              onAddNewShipment={() => {
-                setEditingShipment(null);
-                setIsModalOpen(true);
-              }}
-            />
-          </div>
+          <AllBlMasterView
+            shipments={shipments}
+            onViewDossier={handleViewDossier}
+            onEditShipment={handleEditShipment}
+          />
         )}
 
         {currentView === 'radar' && (
@@ -437,6 +469,8 @@ export function App() {
         shipmentToEdit={editingShipment}
         onSave={handleSaveShipment}
         masters={masters}
+        companyId={activeCompanyId}
+        currentUser={session}
       />
 
       {/* Manage Masters Modal */}
@@ -480,6 +514,19 @@ export function App() {
         onClose={() => setIsImportModalOpen(false)}
         shipments={shipments}
         onRestoreData={handleRestoreData}
+      />
+
+      {/* Status Change Questionnaire — always stamps time + user */}
+      <StatusUpdateModal
+        key={statusPrompt ? `${statusPrompt.shipment.id}-${statusPrompt.newStatus}-${statusPrompt.containerId || 'bl'}` : 'idle'}
+        isOpen={!!statusPrompt}
+        shipment={statusPrompt?.shipment}
+        status={statusPrompt?.newStatus}
+        containerNo={statusPrompt?.containerNo}
+        currentUser={session}
+        requestedAt={statusPrompt?.requestedAt}
+        onClose={() => setStatusPrompt(null)}
+        onConfirm={handleConfirmStatusUpdate}
       />
 
     </div>

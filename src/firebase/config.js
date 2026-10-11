@@ -17,6 +17,7 @@ import {
   serverTimestamp 
 } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 // Web app's Firebase configuration for ccTracker
 // Client key loaded securely from env or decoded fallback (prevents scanner false-positives)
@@ -49,6 +50,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+// Firebase Storage (BL consignment attachments)
+const storage = getStorage(app);
+
 // Authenticate helper (Firestore security rules grant access directly)
 export const initFirebaseAuth = () => Promise.resolve(null);
 
@@ -72,6 +76,11 @@ export {
   app, 
   db, 
   auth,
+  storage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
   analytics, 
   collection, 
   doc, 

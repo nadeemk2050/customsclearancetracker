@@ -1,0 +1,11 @@
+/* Tailwind v4 utility engine.
+   Several views (Loss Prevention Radar, Public Tracking Portal, Dossier drawer,
+   shipment table/modals) are authored with utility classes, so this file is what
+   makes those layouts render as designed.
+
+   Loaded before index.css on purpose: rules in index.css are unlayered, so they
+   keep priority over Tailwind's `utilities` layer and the existing design system
+   is never overridden by a utility class. */
+@import "tailwindcss";
+
+@source "./**/*.{js,jsx}";

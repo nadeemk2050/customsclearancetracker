@@ -13,10 +13,15 @@ import {
   DollarSign, 
   AlertTriangle, 
   CheckCircle,
+  History,
+  Paperclip,
+  FileText,
+  Eye,
   Truck
 } from 'lucide-react';
 import { formatDate, formatDateTime, formatCurrency } from '../utils/dateUtils';
 import { calculateDetentionMetrics } from '../utils/detentionEngine';
+import { BL_ATTACHMENT_SLOTS, formatFileSize } from '../services/attachmentService';
 
 const STAGES = [
   { id: 'Pre-Arrival', label: 'Pre-Arrival' },
@@ -70,6 +75,7 @@ export const DossierDrawer = ({
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 Full Customs Dossier • Created/Updated: {formatDateTime(shipment.updatedAt)}
+                {shipment.updatedBy ? ` • Last update by ${shipment.updatedBy}` : ''}
               </p>
             </div>
           </div>
@@ -140,6 +146,119 @@ export const DossierDrawer = ({
               })}
             </div>
           </div>
+
+          {/* BL Consignment Documents — BL Draft / Original BL received */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                <Paperclip size={14} className="text-blue-700" /> BL Consignment Documents
+              </span>
+              <span className="text-[11px] font-mono text-slate-500">Compressed to ≤ 150 KB</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {BL_ATTACHMENT_SLOTS.map(({ key, label }) => {
+                const doc = (shipment.blDocuments || {})[key];
+                const isImage = (doc?.type || '').startsWith('image/') || doc?.kind === 'image';
+
+                return (
+                  <div
+                    key={key}
+                    className={`p-3 rounded-lg border ${doc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <strong className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</strong>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          doc ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
+                        }`}
+                      >
+                        {doc ? 'RECEIVED' : 'PENDING'}
+                      </span>
+                    </div>
+
+                    {doc ? (
+                      <div className="flex items-center gap-3 mt-2">
+                        {isImage ? (
+                          <a href={doc.url} target="_blank" rel="noreferrer" title="Open full size">
+                            <img
+                              src={doc.url}
+                              alt={`${label} preview`}
+                              className="w-14 h-14 object-cover rounded border border-emerald-200 bg-white"
+                            />
+                          </a>
+                        ) : (
+                          <span className="w-14 h-14 rounded border border-emerald-200 bg-white flex items-center justify-center shrink-0">
+                            <FileText size={22} className="text-emerald-700" />
+                          </span>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] font-bold text-emerald-900 break-words">{doc.name}</div>
+                          <div className="text-[10px] text-emerald-700">
+                            {formatFileSize(doc.size)}
+                            {doc.originalSize > doc.size ? ` (from ${formatFileSize(doc.originalSize)})` : ''}
+                            {doc.pages ? ` · ${doc.pages} page(s)` : ''}
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            {doc.uploadedBy} · {formatDateTime(doc.uploadedAt)}
+                          </div>
+                        </div>
+
+                        <a className="bl-attach-link no-print" href={doc.url} target="_blank" rel="noreferrer">
+                          <Eye size={12} /> View
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 mt-2">Not uploaded yet.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Audit Trail: who changed the status, when, and the answers given */}
+          {(shipment.statusHistory || []).length > 0 && (
+            <div className="bg-white p-4 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                  <History size={14} className="text-blue-700" /> Status Update Audit Trail
+                </span>
+                <span className="text-[11px] font-mono text-slate-500">
+                  {(shipment.statusHistory || []).length} update(s)
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {[...(shipment.statusHistory || [])].reverse().map((entry, idx) => (
+                  <div key={`${entry.at}-${idx}`} className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <strong className="text-xs font-bold text-blue-900">{entry.stageLabel || entry.status}</strong>
+                      <span className="text-[11px] font-mono text-slate-500">{formatDateTime(entry.at)}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-600 mt-0.5">
+                      Updated by <strong>{entry.by}</strong>
+                      {entry.byRole ? ` (${entry.byRole})` : ''}
+                      {entry.containerNo ? ` • Container ${entry.containerNo}` : ''}
+                    </div>
+                    {(entry.details || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {(entry.details || []).map((detail) => (
+                          <span
+                            key={detail.key}
+                            className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700"
+                          >
+                            {detail.label}: <strong>{detail.value}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* D&D Loss Prevention Watchdog Alert */}
           <div className={`p-4 rounded-xl border ${
