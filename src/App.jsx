@@ -211,7 +211,19 @@ export function App() {
     setIsModalOpen(true);
   };
 
+  const checkActionPassword = (actionName = 'proceed with this operation') => {
+    const pwd = window.prompt(`🔒 Security Verification:\nEnter authorization password to ${actionName}:`);
+    if (pwd === 'abcd') {
+      return true;
+    }
+    if (pwd !== null) {
+      alert('❌ Access Denied: Incorrect password. You must enter "abcd" to proceed.');
+    }
+    return false;
+  };
+
   const handleEditShipment = (shipment) => {
+    if (!checkActionPassword('edit this Bill of Lading (BL) shipment')) return;
     setEditingShipment(shipment);
     setIsModalOpen(true);
   };
@@ -231,7 +243,8 @@ export function App() {
   };
 
   const handleDeleteShipment = async (id) => {
-    if (window.confirm('Are you sure you want to delete this Bill of Lading shipment record? This action cannot be undone.')) {
+    if (!checkActionPassword('permanently delete this Bill of Lading (BL) shipment')) return;
+    if (window.confirm('⚠️ Are you sure you want to delete this Bill of Lading shipment record? This action cannot be undone.')) {
       const updated = await removeShipment(id, shipments, activeCompanyId);
       setShipments(updated);
       setSyncStatus({ pending: true });
@@ -242,6 +255,7 @@ export function App() {
   };
 
   const handleQuickUpdateStatus = async (shipment, newStatus) => {
+    if (!checkActionPassword(`update customs status to "${newStatus}"`)) return;
     const updated = {
       ...shipment,
       customsStatus: newStatus,
@@ -256,6 +270,7 @@ export function App() {
   };
 
   const handleQuickContainerReturn = async (shipment, containerId, actionType) => {
+    if (!checkActionPassword('update container tracking status')) return;
     const today = new Date().toISOString().split('T')[0];
     const updatedContainers = (shipment.containers || []).map(c => {
       if (c.id === containerId) {

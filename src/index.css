@@ -295,48 +295,72 @@ button, input, select, textarea {
   border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
-/* Summary KPI Cards */
-.kpi-grid {
+/* Ultra-Compact KPI Strip (Maximizes Main Screen Space) */
+.kpi-strip-bar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.25rem;
-  margin: 1.75rem 0;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 8px 0 12px 0;
 }
 
-.kpi-card {
+@media (max-width: 1024px) {
+  .kpi-strip-bar {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+.kpi-chip {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem 1.5rem;
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
   transition: all var(--transition-fast);
+  user-select: none;
+  min-height: 34px;
 }
 
-.kpi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+.kpi-chip:hover {
+  transform: translateY(-1px);
   border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 
-.kpi-card::before {
-  content: '';
+.chip-accent {
   position: absolute;
-  top: 0;
   left: 0;
+  top: 0;
   bottom: 0;
-  width: 4px;
+  width: 3px;
 }
 
-.kpi-card.blue::before { background: var(--blue-600); }
-.kpi-card.amber::before { background: var(--amber-500); }
-.kpi-card.red::before { background: var(--rose-600); }
-.kpi-card.emerald::before { background: var(--emerald-500); }
-.kpi-card.purple::before { background: var(--purple-600); }
+.chip-accent.blue { background: var(--blue-600); }
+.chip-accent.amber { background: var(--amber-500); }
+.chip-accent.red { background: var(--rose-600); }
+.chip-accent.purple { background: var(--purple-600); }
+.chip-accent.emerald { background: var(--emerald-500); }
+
+.chip-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.chip-value {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
 
 .kpi-info p {
   font-size: 0.8125rem;

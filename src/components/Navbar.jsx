@@ -92,6 +92,66 @@ export const Navbar = ({
             {isMenuOpen && (
               <div className="menu-dropdown-box" style={{ width: '280px' }}>
                 <div className="menu-header-label">
+                  Workspace Views
+                </div>
+
+                <button
+                  id="btn-menu-dashboard"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setCurrentView('dashboard');
+                  }}
+                  className={`menu-item-action ${currentView === 'dashboard' ? 'menu-item-highlight' : ''}`}
+                  style={currentView === 'dashboard' ? { background: 'linear-gradient(to right, rgba(56, 189, 248, 0.15), transparent)' } : {}}
+                >
+                  <div className="menu-icon-square" style={{ background: currentView === 'dashboard' ? '#0284c7' : '#1e293b', color: '#ffffff' }}>
+                    <Layers size={17} />
+                  </div>
+                  <div>
+                    <div className="menu-item-title" style={{ color: currentView === 'dashboard' ? '#38bdf8' : '#f8fafc' }}>Operations Command</div>
+                    <div className="menu-item-sub">Active BL shipments & dossiers</div>
+                  </div>
+                </button>
+
+                <button
+                  id="btn-menu-loss-radar"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setCurrentView('radar');
+                  }}
+                  className={`menu-item-action ${currentView === 'radar' ? 'menu-item-highlight' : ''}`}
+                  style={currentView === 'radar' ? { background: 'linear-gradient(to right, rgba(239, 68, 68, 0.15), transparent)' } : {}}
+                >
+                  <div className="menu-icon-square" style={{ background: currentView === 'radar' ? '#ef4444' : '#1e293b', color: '#ffffff' }}>
+                    <ShieldAlert size={17} />
+                  </div>
+                  <div>
+                    <div className="menu-item-title" style={{ color: currentView === 'radar' ? '#f87171' : '#f8fafc' }}>Loss Prevention Radar</div>
+                    <div className="menu-item-sub">Demurrage & detention cutoffs</div>
+                  </div>
+                </button>
+
+                <button
+                  id="btn-menu-customer-portal"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setCurrentView('portal');
+                  }}
+                  className={`menu-item-action ${currentView === 'portal' ? 'menu-item-highlight' : ''}`}
+                  style={currentView === 'portal' ? { background: 'linear-gradient(to right, rgba(14, 165, 233, 0.15), transparent)' } : {}}
+                >
+                  <div className="menu-icon-square" style={{ background: currentView === 'portal' ? '#0284c7' : '#1e293b', color: '#ffffff' }}>
+                    <Search size={17} />
+                  </div>
+                  <div>
+                    <div className="menu-item-title" style={{ color: currentView === 'portal' ? '#38bdf8' : '#f8fafc' }}>Public Tracking Portal</div>
+                    <div className="menu-item-sub">Client self-service tracking</div>
+                  </div>
+                </button>
+
+                <div className="menu-divider"></div>
+
+                <div className="menu-header-label">
                   Administration & Configuration
                 </div>
 
@@ -277,23 +337,7 @@ export const Navbar = ({
             <span>Operations Command</span>
           </button>
 
-          <button
-            id="tab-loss-radar"
-            onClick={() => setCurrentView('radar')}
-            className={`nav-tab-btn ${currentView === 'radar' ? 'active' : ''}`}
-          >
-            <ShieldAlert size={16} />
-            <span>Loss Prevention Radar</span>
-          </button>
 
-          <button
-            id="tab-customer-portal"
-            onClick={() => setCurrentView('portal')}
-            className={`nav-tab-btn ${currentView === 'portal' ? 'active' : ''}`}
-          >
-            <Search size={16} />
-            <span>Public Tracking Portal</span>
-          </button>
 
 
 
