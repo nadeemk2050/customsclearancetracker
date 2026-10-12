@@ -24,6 +24,13 @@ import {
   Terminal,
   Table
 } from 'lucide-react';
+import { requestMaintenanceAccess } from '../utils/securityGate';
+import {
+  isViewLocked,
+  getMaintenanceLabel,
+  isViewUnlockedThisSession,
+  unlockViewForSession
+} from '../config/maintenanceMode';
 
 export const Navbar = ({ 
   currentView, 
@@ -67,8 +74,17 @@ export const Navbar = ({
     }
   };
 
-  const companyName = currentSession?.companyName || 'AL MUMTAZ CUSTOMS CLEARING LLC';
-  const displayName = currentSession?.displayName || currentSession?.username || 'Administrator';
+  // Views under maintenance stay hidden until the password is entered (once per session)
+  const handleLockedView = (viewId) => {
+    if (!isViewLocked(viewId) || isViewUnlockedThisSession(viewId)) return true;
+    if (requestMaintenanceAccess(getMaintenanceLabel(viewId))) {
+      unlockViewForSession(viewId);
+      return true;
+    }
+    return false;
+  };
+
+  const companyName = currentSession?.companyName || 'AL MUMTAZ CUSTOMS CLEARING LLC';  const displayName = currentSession?.displayName || currentSession?.username || 'Administrator';
   const role = currentSession?.role || 'CHA Administrator';
 
   return (
@@ -136,6 +152,7 @@ export const Navbar = ({
                 <button
                   id="btn-menu-loss-radar"
                   onClick={() => {
+                    if (!handleLockedView('radar')) return;
                     setIsMenuOpen(false);
                     setCurrentView('radar');
                   }}
@@ -146,7 +163,10 @@ export const Navbar = ({
                     <ShieldAlert size={17} />
                   </div>
                   <div>
-                    <div className="menu-item-title" style={{ color: currentView === 'radar' ? '#f87171' : '#f8fafc' }}>Loss Prevention Radar</div>
+                    <div className="menu-item-title" style={{ color: currentView === 'radar' ? '#f87171' : '#f8fafc' }}>
+                      Loss Prevention Radar
+                      {isViewLocked('radar') && <span className="menu-lock-badge">Maintenance</span>}
+                    </div>
                     <div className="menu-item-sub">Demurrage & detention cutoffs</div>
                   </div>
                 </button>
@@ -154,6 +174,7 @@ export const Navbar = ({
                 <button
                   id="btn-menu-customer-portal"
                   onClick={() => {
+                    if (!handleLockedView('portal')) return;
                     setIsMenuOpen(false);
                     setCurrentView('portal');
                   }}
@@ -164,7 +185,10 @@ export const Navbar = ({
                     <Search size={17} />
                   </div>
                   <div>
-                    <div className="menu-item-title" style={{ color: currentView === 'portal' ? '#38bdf8' : '#f8fafc' }}>Public Tracking Portal</div>
+                    <div className="menu-item-title" style={{ color: currentView === 'portal' ? '#38bdf8' : '#f8fafc' }}>
+                      Public Tracking Portal
+                      {isViewLocked('portal') && <span className="menu-lock-badge">Maintenance</span>}
+                    </div>
                     <div className="menu-item-sub">Client self-service tracking</div>
                   </div>
                 </button>

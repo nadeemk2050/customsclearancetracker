@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
-  Printer, 
+  Download,
+  Loader2,
   Edit3, 
   ShieldAlert, 
   Calendar, 
@@ -22,6 +23,7 @@ import {
 import { formatDate, formatDateTime, formatCurrency } from '../utils/dateUtils';
 import { calculateDetentionMetrics } from '../utils/detentionEngine';
 import { BL_ATTACHMENT_SLOTS, formatFileSize } from '../services/attachmentService';
+import { downloadDossierPdf } from '../utils/dossierPdf';
 
 const STAGES = [
   { id: 'Pre-Arrival', label: 'Pre-Arrival' },
@@ -40,23 +42,34 @@ export const DossierDrawer = ({
   isOpen, 
   onClose, 
   onEdit, 
-  onUpdateStatus 
+  onUpdateStatus,
+  companyName = 'CustomsTrack PRO'
 }) => {
+  const [pdfState, setPdfState] = useState('idle'); // idle | working | error
+  const [pdfError, setPdfError] = useState('');
+
   if (!isOpen || !shipment) return null;
 
   const metrics = calculateDetentionMetrics(shipment);
   const currentStageIndex = STAGES.findIndex(s => s.id === shipment.customsStatus);
   const progressPercent = Math.max(0, Math.min(100, (currentStageIndex / (STAGES.length - 1)) * 100));
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownloadPdf = async () => {
+    setPdfError('');
+    setPdfState('working');
+    try {
+      await downloadDossierPdf({ shipment, companyName });
+      setPdfState('idle');
+    } catch (err) {
+      setPdfError(err?.message || 'Could not generate the PDF. Please try again.');
+      setPdfState('error');
+    }
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-box" style={{ maxWidth: '1050px', maxHeight: '92vh' }}>
-        {/* Header */}
-        <div className="modal-header">
+    <div className="bl-form-page" role="dialog" aria-modal="true" aria-label={`BL dossier ${shipment.blNo}`}>
+      {/* Header */}
+      <header className="bl-form-header">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-900 text-white flex items-center justify-center font-bold">
               <Ship size={22} />
@@ -80,14 +93,15 @@ export const DossierDrawer = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 no-print">
+          <div className="dossier-header-actions">
             <button
-              onClick={handlePrint}
+              onClick={handleDownloadPdf}
               className="btn btn-outline btn-sm"
-              title="Print official customs tracking dossier"
+              disabled={pdfState === 'working'}
+              title="Download this dossier as a PDF document"
             >
-              <Printer size={15} />
-              <span>Print Dossier</span>
+              {pdfState === 'working' ? <Loader2 size={15} className="spin" /> : <Download size={15} />}
+              <span>{pdfState === 'working' ? 'Preparing PDF...' : 'Download PDF'}</span>
             </button>
             <button
               onClick={() => {
@@ -99,14 +113,21 @@ export const DossierDrawer = ({
               <Edit3 size={15} />
               <span>Edit Record</span>
             </button>
-            <button onClick={onClose} className="btn-icon-only text-slate-400 hover:text-slate-700">
+            <button onClick={onClose} className="btn-icon-only" style={{ color: '#cbd5e1' }} aria-label="Close dossier">
               <X size={20} />
             </button>
           </div>
-        </div>
+        </header>
 
         {/* Body */}
-        <div className="modal-body space-y-6">
+        <div className="bl-form-body dossier-body">
+          {pdfError && (
+              <div className="bl-error-bar">
+                <AlertTriangle size={15} />
+                <span>{pdfError}</span>
+              </div>
+            )}
+
           {/* Visual Milestone Stepper */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div className="flex items-center justify-between mb-2">
@@ -491,13 +512,17 @@ export const DossierDrawer = ({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="modal-footer no-print">
+      {/* Footer */}
+      <footer className="bl-form-footer">
+        <span className="bl-hint" style={{ marginTop: 0 }}>
+          Live dossier - use Download PDF to share or archive it.
+        </span>
+        <div className="bl-form-actions">
           <button onClick={onClose} className="btn btn-outline">
             Close Dossier
           </button>
         </div>
-      </div>
+      </footer>
     </div>
   );
 };

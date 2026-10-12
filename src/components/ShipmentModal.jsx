@@ -1,29 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Plus, 
-  Trash2, 
-  Box, 
-  Save, 
-  AlertCircle, 
-  Calendar, 
-  DollarSign, 
-  Ship, 
-  FileCheck2, 
-  ShieldAlert,
-  Sparkles,
-  ArrowRight,
-  ArrowLeft,
-  Check,
-  CheckCircle2,
-  Clock,
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  X,
+  Plus,
+  Trash2,
+  Ship,
   MapPin,
-  Building2,
-  Coins
+  CalendarClock,
+  Coins,
+  Box,
+  Paperclip,
+  Save,
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Clock
 } from 'lucide-react';
-import { addDays, formatDate, formatCurrency } from '../utils/dateUtils';
+import { addDays, getDaysDifference } from '../utils/dateUtils';
 import { BlAttachmentUpload } from './BlAttachmentUpload';
 import { BL_ATTACHMENT_SLOTS } from '../services/attachmentService';
+import { STATUS_STAGES } from '../utils/statusStages';
 
 const DEFAULT_CONTAINER = {
   id: '',
@@ -39,13 +34,15 @@ const DEFAULT_CONTAINER = {
   status: 'At Port (Full)'
 };
 
+// Only the fields shown on this page are edited here. Every other dossier field keeps
+// whatever value the record already had, so nothing is lost when saving.
 const DEFAULT_SHIPMENT = {
   blNo: '',
-  shippingLine: 'Hapag-Lloyd',
+  shippingLine: '',
   vessel: '',
   voyage: '',
   pol: '',
-  pod: 'Jebel Ali Port (AEJEA)',
+  pod: '',
   finalDestination: '',
   consignee: '',
   shipper: '',
@@ -64,7 +61,7 @@ const DEFAULT_SHIPMENT = {
   doSecurityDeposit: {
     amount: '',
     currency: 'USD',
-    status: 'Deposited',
+    status: 'Deposited (Awaiting Empty Return)',
     receiptNo: ''
   },
   eta: '',
@@ -94,33 +91,123 @@ const DEFAULT_SHIPMENT = {
   containers: [{ ...DEFAULT_CONTAINER, id: 'c_' + Date.now() }]
 };
 
-const TABS = [
-  { id: 'general', step: '1', label: 'Logistics & Routing', icon: Ship },
-  { id: 'freetime', step: '2', label: 'Demurrage & Free Time', icon: ShieldAlert },
-  { id: 'customs', step: '3', label: 'Customs & DO', icon: DollarSign },
-  { id: 'containers', step: '4', label: 'Containers', icon: Box },
-  { id: 'documents', step: '5', label: 'Document Checklist', icon: FileCheck2 }
+const CONTAINER_SIZES = [
+  { value: '20GP', label: "20' General Purpose" },
+  { value: '40GP', label: "40' General Purpose" },
+  { value: '40HC', label: "40' High Cube" },
+  { value: '45HC', label: "45' High Cube" },
+  { value: '20RF', label: "20' Reefer" },
+  { value: '40RF', label: "40' Reefer" },
+  { value: '20OT', label: "20' Open Top" },
+  { value: '40OT', label: "40' Open Top" },
+  { value: '40FR', label: "40' Flat Rack" }
 ];
 
-export const ShipmentModal = ({ 
-  isOpen, 
-  onClose, 
-  shipmentToEdit, 
+const CONTAINER_STATUSES = [
+  'At Port (Full)',
+  'Gate Out (In Transit)',
+  'At Consignee (Unloading)',
+  'Empty Returned (Safe)'
+];
+
+const DEPOSIT_STATUSES = [
+  'Deposited (Awaiting Empty Return)',
+  'Refund Claimed',
+  'Refunded',
+  'Forfeited / Deducted',
+  'Not Applicable'
+];
+
+const labelText = (label, required) => (
+  <span>
+    {label}
+    {required ? <span className="req"> *</span> : null}
+  </span>
+);
+
+const Field = ({ id, label, required, value, onChange, placeholder, hint, listId, type = 'text', inputMode, mono }) => (
+  <div>
+    <label className="bl-label" htmlFor={id}>{labelText(label, required)}</label>
+    <input
+      id={id}
+      type={type}
+      className={'bl-input' + (mono ? ' mono' : '')}
+      list={listId}
+      inputMode={inputMode}
+      autoComplete="off"
+      placeholder={placeholder}
+      value={value ?? ''}
+      onChange={(event) => onChange(event.target.value)}
+    />
+    {hint ? <div className="bl-hint">{hint}</div> : null}
+  </div>
+);
+
+const Select = ({ id, label, required, value, onChange, options, hint }) => (
+  <div>
+    <label className="bl-label" htmlFor={id}>{labelText(label, required)}</label>
+    <select id={id} className="bl-input" value={value ?? ''} onChange={(event) => onChange(event.target.value)}>
+      <option value="">- Select -</option>
+      {options.map((option) => {
+        const val = typeof option === 'string' ? option : option.value;
+        const text = typeof option === 'string' ? option : option.label;
+        return <option key={val} value={val}>{text}</option>;
+      })}
+      {value && !options.some((option) => (typeof option === 'string' ? option : option.value) === value) ? (
+        <option value={value}>{value}</option>
+      ) : null}
+    </select>
+    {hint ? <div className="bl-hint">{hint}</div> : null}
+  </div>
+);
+
+const Section = ({ id, step, title, Icon, meta, isOpen, onToggle, children }) => (
+  <section id={'bl-sec-' + id} className={'bl-section' + (isOpen ? ' open' : '')}>
+    <button type="button" className="bl-section-head" onClick={onToggle} aria-expanded={isOpen}>
+      <span className="bl-step-badge">{step}</span>
+      <Icon size={15} style={{ color: '#2563eb', flexShrink: 0 }} />
+      <span className="bl-section-title">{title}</span>
+      {meta ? <span className="bl-section-meta">{meta}</span> : null}
+      {isOpen
+        ? <ChevronDown size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />
+        : <ChevronRight size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />}
+    </button>
+    {isOpen ? <div className="bl-section-body">{children}</div> : null}
+  </section>
+);
+
+export const ShipmentModal = ({
+  isOpen,
+  onClose,
+  shipmentToEdit,
   onSave,
   masters = {},
   companyId = 'default',
   currentUser = null
 }) => {
   const [formData, setFormData] = useState(DEFAULT_SHIPMENT);
-  const [activeTab, setActiveTab] = useState('general');
+  const [openSections, setOpenSections] = useState({
+    carrier: true,
+    routing: true,
+    dates: true,
+    deposit: true,
+    containers: true,
+    attachments: true
+  });
   const [error, setError] = useState('');
 
-  const shippingLinesList = masters.shippingLines || [];
-  const consigneesList = masters.consignees || [];
-  const shippersList = masters.shippers || [];
-  const portsList = masters.ports || [];
-  const cargoList = masters.cargoDescriptions || [];
-  const depotsList = masters.depots || [];
+  const shippingLines = (masters.shippingLines || []).map((line) => line.name);
+  const consignees = masters.consignees || [];
+  const shippers = (masters.shippers || []).map((item) => item.name);
+  const ports = (masters.ports || []).map((port) => port.name);
+  const cargoItems = masters.cargoDescriptions || [];
+
+  // Depots are filtered by the selected carrier, falling back to the full list
+  const depotOptions = useMemo(() => {
+    const all = masters.depots || [];
+    const forLine = all.filter((d) => !d.shippingLine || d.shippingLine === formData.shippingLine);
+    return (forLine.length > 0 ? forLine : all).map((depot) => depot.name);
+  }, [masters.depots, formData.shippingLine]);
 
   useEffect(() => {
     if (shipmentToEdit) {
@@ -154,54 +241,87 @@ export const ShipmentModal = ({
     setError('');
   }, [shipmentToEdit, isOpen]);
 
+  // Free-time countdowns: how many days remain, not what they would cost
+  const freeTime = useMemo(() => {
+    const asDays = (value) => {
+      const parsed = parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const build = (label, expiry) => {
+      if (!expiry) return { label, state: 'muted', text: 'Set discharge date' };
+      const left = getDaysDifference(expiry);
+      if (left === null) return { label, state: 'muted', text: 'Not set' };
+      if (left < 0) return { label, state: 'over', text: Math.abs(left) + ' day(s) over' };
+      if (left === 0) return { label, state: 'warn', text: 'Expires today' };
+      if (left <= 2) return { label, state: 'warn', text: left + ' day(s) left' };
+      return { label, state: 'safe', text: left + ' day(s) left' };
+    };
+
+    const discharge = formData.dischargeDate;
+    return [
+      build('Port free storage', discharge ? addDays(discharge, asDays(formData.portFreeDays)) : ''),
+      build('Line D&D free time', discharge ? addDays(discharge, asDays(formData.lineFreeDays)) : '')
+    ];
+  }, [formData.dischargeDate, formData.portFreeDays, formData.lineFreeDays]);
+
   if (!isOpen) return null;
 
-  const currentTabIndex = TABS.findIndex(t => t.id === activeTab);
-
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const toggleSection = (id) => {
+    setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Master auto-fill when selecting carrier
+  const sectionProps = (id) => ({
+    id,
+    isOpen: openSections[id],
+    onToggle: () => toggleSection(id)
+  });
+
+  const handleInputChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const revealSection = (id) => {
+    setOpenSections((prev) => ({ ...prev, [id]: true }));
+    if (typeof document !== 'undefined') {
+      setTimeout(() => {
+        document.getElementById('bl-sec-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
+    }
+  };
+
+  // Master auto-fills
   const handleShippingLineSelect = (lineName) => {
-    const matched = shippingLinesList.find(l => l.name === lineName);
-    setFormData(prev => ({
+    const matched = (masters.shippingLines || []).find((line) => line.name === lineName);
+    setFormData((prev) => ({
       ...prev,
       shippingLine: lineName,
       portFreeDays: matched?.defaultPortFreeDays ?? prev.portFreeDays,
-      lineFreeDays: matched?.defaultLineFreeDays ?? prev.lineFreeDays,
-      lineDetentionDailyRate: matched?.defaultDetentionRate ?? prev.lineDetentionDailyRate
+      lineFreeDays: matched?.defaultLineFreeDays ?? prev.lineFreeDays
     }));
   };
 
-  // Master auto-fill when selecting consignee
-  const handleConsigneeSelect = (consigneeName) => {
-    const matched = consigneesList.find(c => c.name.toLowerCase() === consigneeName.toLowerCase());
-    setFormData(prev => ({
+  const handleConsigneeSelect = (name) => {
+    const matched = consignees.find((item) => item.name.toLowerCase() === name.toLowerCase());
+    setFormData((prev) => ({
       ...prev,
-      consignee: consigneeName,
+      consignee: name,
       finalDestination: matched?.destinationYard || matched?.address || prev.finalDestination
     }));
   };
 
-  // Master auto-fill when selecting POD
   const handlePodSelect = (podName) => {
-    const matched = portsList.find(p => p.name.toLowerCase() === podName.toLowerCase());
-    setFormData(prev => ({
+    const matched = (masters.ports || []).find((port) => port.name.toLowerCase() === podName.toLowerCase());
+    setFormData((prev) => ({
       ...prev,
       pod: podName,
-      portFreeDays: matched?.defaultPortFreeDays ?? prev.portFreeDays,
-      portStorageDailyRate: matched?.defaultPortDailyRate ?? prev.portStorageDailyRate
+      portFreeDays: matched?.defaultPortFreeDays ?? prev.portFreeDays
     }));
   };
 
-  // Master auto-fill when selecting cargo
   const handleCargoSelect = (cargoDesc) => {
-    const matched = cargoList.find(c => c.description.toLowerCase() === cargoDesc.toLowerCase());
-    setFormData(prev => ({
+    const matched = cargoItems.find((item) => item.description.toLowerCase() === cargoDesc.toLowerCase());
+    setFormData((prev) => ({
       ...prev,
       cargoDescription: cargoDesc,
       hsCode: matched?.defaultHsCode || prev.hsCode,
@@ -210,993 +330,503 @@ export const ShipmentModal = ({
   };
 
   const handleDepositChange = (field, value) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      doSecurityDeposit: {
-        ...prev.doSecurityDeposit,
-        [field]: value
-      }
-    }));
-  };
-
-  const handleDocumentToggle = (docKey) => {
-    setFormData(prev => ({
-      ...prev,
-      documents: {
-        ...prev.documents,
-        [docKey]: !prev.documents[docKey]
-      }
+      doSecurityDeposit: { ...prev.doSecurityDeposit, [field]: value }
     }));
   };
 
   const handleBlAttachmentChange = (slotKey, attachment) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      blDocuments: {
-        ...(prev.blDocuments || {}),
-        [slotKey]: attachment
-      }
+      blDocuments: { ...(prev.blDocuments || {}), [slotKey]: attachment }
     }));
   };
 
   const handleContainerChange = (index, field, value) => {
-    const updated = [...formData.containers];
-    updated[index] = { ...updated[index], [field]: value };
-    setFormData(prev => ({ ...prev, containers: updated }));
+    setFormData((prev) => ({
+      ...prev,
+      containers: prev.containers.map((container, i) => (i === index ? { ...container, [field]: value } : container))
+    }));
   };
 
   const addContainerRow = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       containers: [
         ...prev.containers,
-        { 
-          ...DEFAULT_CONTAINER, 
+        {
+          ...DEFAULT_CONTAINER,
           id: 'c_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
           dischargeDate: prev.dischargeDate || '',
-          emptyReturnDepot: depotsList[0]?.name || ''
+          emptyReturnDepot: depotOptions[0] || ''
         }
       ]
     }));
   };
 
   const removeContainerRow = (index) => {
-    if (formData.containers.length <= 1) {
-      alert('A shipment must contain at least one container.');
-      return;
-    }
-    const updated = formData.containers.filter((_, i) => i !== index);
-    setFormData(prev => ({ ...prev, containers: updated }));
+    setFormData((prev) => ({
+      ...prev,
+      containers: prev.containers.filter((_, i) => i !== index)
+    }));
   };
 
-  const handleNextTab = () => {
-    if (currentTabIndex < TABS.length - 1) {
-      setActiveTab(TABS[currentTabIndex + 1].id);
+  const validate = () => {
+    if (!formData.blNo.trim()) return { message: 'Bill of Lading (BL) Number is required.', section: 'carrier' };
+    if (!formData.shippingLine.trim()) return { message: 'Shipping Line / Carrier is required.', section: 'carrier' };
+    if (!formData.pod.trim()) return { message: 'Port of Discharge (POD) is required.', section: 'routing' };
+    if (!formData.consignee.trim()) return { message: 'Consignee (Importer) is required.', section: 'routing' };
+    if (!formData.dischargeDate) {
+      return { message: 'Vessel Discharge Date is required - it starts the free-time clock (day 0).', section: 'dates' };
     }
+    const emptyIndex = formData.containers.findIndex((container) => !container.containerNo.trim());
+    if (emptyIndex >= 0) {
+      return { message: 'Container Number is required for unit #' + (emptyIndex + 1) + '.', section: 'containers' };
+    }
+    return null;
   };
 
-  const handlePrevTab = () => {
-    if (currentTabIndex > 0) {
-      setActiveTab(TABS[currentTabIndex - 1].id);
-    }
-  };
+  const handleSubmit = (event) => {
+    if (event?.preventDefault) event.preventDefault();
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.blNo.trim()) {
-      setError('Bill of Lading (BL) Number is required.');
-      setActiveTab('general');
-      return;
-    }
-
-    const hasEmptyContainerNo = formData.containers.some(c => !c.containerNo.trim());
-    if (hasEmptyContainerNo) {
-      setError('All containers must have a valid Container Number.');
-      setActiveTab('containers');
+    const problem = validate();
+    if (problem) {
+      setError(problem.message);
+      revealSection(problem.section);
       return;
     }
 
-    onSave(formData);
+    onSave({
+      ...formData,
+      blNo: formData.blNo.trim().toUpperCase(),
+      // Keep the manifest aligned with the vessel discharge date
+      containers: formData.containers.map((container) => ({
+        ...container,
+        containerNo: container.containerNo.trim().toUpperCase(),
+        dischargeDate: container.dischargeDate || formData.dischargeDate
+      }))
+    });
     onClose();
   };
 
-  // Live calculations
-  const portExpiryPreview = formData.dischargeDate ? addDays(formData.dischargeDate, formData.portFreeDays) : '—';
-  const lineExpiryPreview = formData.dischargeDate ? addDays(formData.dischargeDate, formData.lineFreeDays) : '—';
-  const verifiedDocCount = Object.values(formData.documents || {}).filter(Boolean).length;
+  const containerCount = formData.containers.length;
 
   return (
-    <div className="modal-overlay">
-      <div className="shipment-modal-container">
-        {/* Header */}
-        <div className="dossier-modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{
-              width: '46px',
-              height: '46px',
-              borderRadius: '12px',
+    <div className="bl-form-page" role="dialog" aria-modal="true" aria-label="BL consignment details">
+      {/* Master data powering the dropdowns (typing a new value stays possible) */}
+      <datalist id="master-shipping-lines">{shippingLines.map((name) => <option key={name} value={name} />)}</datalist>
+      <datalist id="master-consignees">{consignees.map((item) => <option key={item.id || item.name} value={item.name} />)}</datalist>
+      <datalist id="master-shippers">{shippers.map((name) => <option key={name} value={name} />)}</datalist>
+      <datalist id="master-ports">{ports.map((name) => <option key={name} value={name} />)}</datalist>
+      <datalist id="master-cargo">{cargoItems.map((item) => <option key={item.id || item.description} value={item.description} />)}</datalist>
+      <datalist id="master-depots">{depotOptions.map((name) => <option key={name} value={name} />)}</datalist>
+
+      <header className="bl-form-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '11px',
               background: 'linear-gradient(135deg, #2563eb, #06b6d4)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              flexShrink: 0,
               boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)'
-            }}>
-              <Ship size={24} color="#ffffff" />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-0.01em' }}>
-                  {shipmentToEdit ? `Edit BLs Consignment — ${shipmentToEdit.blNo}` : 'Add New BL Consignment Details'}
-                </h2>
-                <span className="brand-badge">Full Suite</span>
-              </div>
-              <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '3px 0 0' }}>
-                End-to-end logistics tracking, automated demurrage loss prevention, and multi-container equipment manifest.
-              </p>
-            </div>
+            }}
+          >
+            <Ship size={21} color="#ffffff" />
           </div>
-          <button onClick={onClose} className="btn-icon-only text-slate-400 hover:text-white">
-            <X size={20} />
-          </button>
+          <div style={{ minWidth: 0 }}>
+            <h2>{shipmentToEdit ? 'Edit BLs Consignment - ' + shipmentToEdit.blNo : 'Add New BL Consignment'}</h2>
+            <p>
+              {containerCount} container unit(s)
+              {formData.blNo ? ' | BL ' + formData.blNo : ''}
+              {formData.customsStatus ? ' | ' + formData.customsStatus : ''}
+            </p>
+          </div>
         </div>
 
-        {/* Segmented Pill Tab Bar */}
-        <div className="dossier-tab-strip">
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            const labelText = tab.id === 'containers' 
-              ? `Containers (${formData.containers.length})` 
-              : tab.id === 'documents'
-              ? `Documents (${verifiedDocCount}/10)`
-              : tab.label;
+        <button
+          type="button"
+          className="btn-icon-only"
+          onClick={onClose}
+          aria-label="Close BL form"
+          style={{ color: '#cbd5e1', flexShrink: 0 }}
+        >
+          <X size={20} />
+        </button>
+      </header>
 
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`dossier-tab-item ${isActive ? 'active' : ''}`}
-              >
-                <span className="dossier-step-circle">{tab.step}</span>
-                <Icon size={14} style={{ color: isActive ? '#2563eb' : '#64748b' }} />
-                <span>{labelText}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="dossier-body-scroll">
-          {error && (
-            <div style={{
-              marginBottom: '1.25rem',
-              padding: '12px 16px',
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#b91c1c',
-              borderRadius: '10px',
-              fontSize: '0.825rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <AlertCircle size={16} />
+      <div className="bl-form-body">
+        <form className="bl-form-inner" onSubmit={handleSubmit} noValidate>
+          {error ? (
+            <div className="bl-error-bar">
+              <AlertCircle size={15} />
               <span>{error}</span>
             </div>
-          )}
+          ) : null}
 
-          {/* Datalists for Masters Autocomplete */}
-          <datalist id="master-consignees-list">
-            {consigneesList.map(c => (
-              <option key={c.id} value={c.name}>{c.destinationYard || c.address}</option>
-            ))}
-          </datalist>
+          <Section
+            {...sectionProps('carrier')}
+            step="1"
+            title="BL and Ship Details"
+            Icon={Ship}
+            meta={formData.shippingLine || ''}
+          >
+            <div className="bl-form-grid">
+              <Field
+                id="bl-no"
+                label="Bill of Lading (BL) Number"
+                required
+                mono
+                value={formData.blNo}
+                onChange={(value) => handleInputChange('blNo', value.toUpperCase())}
+                placeholder="e.g. HLCUTOR260620111"
+              />
+              <Field
+                id="bl-carrier"
+                listId="master-shipping-lines"
+                label="Shipping Line / Carrier"
+                required
+                value={formData.shippingLine}
+                onChange={handleShippingLineSelect}
+                placeholder="Select carrier or type..."
+                hint="Picking a master carrier loads its default free days"
+              />
+              <Field
+                id="bl-vessel"
+                label="Vessel Name"
+                value={formData.vessel}
+                onChange={(value) => handleInputChange('vessel', value)}
+                placeholder="e.g. AL ZUBARA"
+              />
+              <Field
+                id="bl-voyage"
+                label="Voyage Number"
+                value={formData.voyage}
+                onChange={(value) => handleInputChange('voyage', value)}
+                placeholder="e.g. 2604E"
+              />
+            </div>
+          </Section>
 
-          <datalist id="master-shippers-list">
-            {shippersList.map(s => (
-              <option key={s.id} value={s.name}>{s.country}</option>
-            ))}
-          </datalist>
+          <Section
+            {...sectionProps('routing')}
+            step="2"
+            title="Shipper, Consignee and Cargo Details"
+            Icon={MapPin}
+            meta={formData.pod || ''}
+          >
+            <div className="bl-form-grid">
+              <Field
+                id="bl-pol"
+                listId="master-ports"
+                label="Port of Loading (POL)"
+                value={formData.pol}
+                onChange={(value) => handleInputChange('pol', value)}
+                placeholder="e.g. Hamburg Port (DEHAM)"
+              />
+              <Field
+                id="bl-pod"
+                listId="master-ports"
+                label="Port of Discharge (POD)"
+                required
+                value={formData.pod}
+                onChange={handlePodSelect}
+                placeholder="e.g. Jebel Ali Port (AEJEA)"
+                hint="Picking a master port loads its default storage days"
+              />
+              <Field
+                id="bl-consignee"
+                listId="master-consignees"
+                label="Consignee (Importer)"
+                required
+                value={formData.consignee}
+                onChange={handleConsigneeSelect}
+                placeholder="Select master consignee or type..."
+                hint={formData.finalDestination ? 'Delivery address: ' + formData.finalDestination : 'Auto-fills the delivery address'}
+              />
+              <Field
+                id="bl-shipper"
+                listId="master-shippers"
+                label="Shipper (Exporter / Supplier)"
+                value={formData.shipper}
+                onChange={(value) => handleInputChange('shipper', value)}
+                placeholder="Select master shipper or type..."
+              />
+              <Field
+                id="bl-cargo"
+                listId="master-cargo"
+                label="Cargo Description"
+                value={formData.cargoDescription}
+                onChange={handleCargoSelect}
+                placeholder="Select from master cargo or type..."
+                hint={formData.hsCode ? 'HS Code: ' + formData.hsCode : 'Auto-fills HS code and packaging'}
+              />
+              <Field
+                id="bl-packages"
+                label="Packaging & Total Packages"
+                value={formData.totalPackages}
+                onChange={(value) => handleInputChange('totalPackages', value)}
+                placeholder="e.g. 960 Bags / 24 Pallets"
+              />
+              <Field
+                id="bl-weight"
+                label="Gross Weight (KG)"
+                inputMode="decimal"
+                value={formData.grossWeightKg}
+                onChange={(value) => handleInputChange('grossWeightKg', value)}
+                placeholder="e.g. 52140"
+              />
+            </div>
+          </Section>
 
-          <datalist id="master-ports-list">
-            {portsList.map(p => (
-              <option key={p.id} value={p.name}>{p.country} ({p.code})</option>
-            ))}
-          </datalist>
-
-          <datalist id="master-cargo-list">
-            {cargoList.map(crg => (
-              <option key={crg.id} value={crg.description}>HS: {crg.defaultHsCode}</option>
-            ))}
-          </datalist>
-
-          <datalist id="master-depots-list">
-            {depotsList.map(d => (
-              <option key={d.id} value={d.name}>{d.shippingLine} — {d.location}</option>
-            ))}
-          </datalist>
-
-          {/* TAB 1: LOGISTICS & ROUTING */}
-          {activeTab === 'general' && (
-            <div>
-              {/* Card 1: Ocean Freight Identification */}
-              <div className="dossier-group-card">
-                <div className="dossier-group-title">
-                  <Ship size={16} color="#2563eb" />
-                  <span>1. Ocean Freight & Carrier Identification</span>
+          <Section
+            {...sectionProps('dates')}
+            step="3"
+            title="Dates, Free Time & Milestone"
+            Icon={CalendarClock}
+            meta={formData.customsStatus || ''}
+          >
+            <div className="bl-form-grid">
+              <Field
+                id="bl-eta"
+                type="date"
+                label="Estimated Time of Arrival (ETA)"
+                value={formData.eta}
+                onChange={(value) => handleInputChange('eta', value)}
+              />
+              <Field
+                id="bl-discharge"
+                type="date"
+                label="Vessel Discharge Date (Clock Start Day 0)"
+                required
+                value={formData.dischargeDate}
+                onChange={(value) => handleInputChange('dischargeDate', value)}
+              />
+              <Field
+                id="bl-port-free"
+                label="Port Terminal Free Storage Days"
+                inputMode="numeric"
+                value={formData.portFreeDays}
+                onChange={(value) => handleInputChange('portFreeDays', value)}
+                placeholder="e.g. 5"
+              />
+              <Field
+                id="bl-line-free"
+                label="Shipping Line Demurrage & Detention Free Days"
+                inputMode="numeric"
+                value={formData.lineFreeDays}
+                onChange={(value) => handleInputChange('lineFreeDays', value)}
+                placeholder="e.g. 14"
+              />
+              <Select
+                id="bl-milestone"
+                label="Current Customs Clearance Milestone"
+                value={formData.customsStatus}
+                onChange={(value) => handleInputChange('customsStatus', value)}
+                options={STATUS_STAGES.map((stage) => ({ value: stage.id, label: stage.label }))}
+              />
+              <div className="bl-field-full">
+                <span className="bl-label">Free Time Remaining</span>
+                <div className="bl-days-chips">
+                  {freeTime.map((chip) => (
+                    <span key={chip.label} className={'bl-days-chip ' + chip.state}>
+                      <Clock size={13} />
+                      {chip.label}: <strong>{chip.text}</strong>
+                    </span>
+                  ))}
                 </div>
-                <div className="dossier-grid-2">
-                  <div>
-                    <label className="dossier-field-label">
-                      <span>Bill of Lading (BL) Number *</span>
-                      <span className="dossier-helper-tag">Master or House BL</span>
-                    </label>
-                    <input
-                      required
-                      type="text"
-                      className="dossier-input-control mono"
-                      style={{ textTransform: 'uppercase', fontWeight: 800, fontSize: '0.95rem', letterSpacing: '0.05em' }}
-                      placeholder="e.g. HLCUTOR260620111"
-                      value={formData.blNo}
-                      onChange={(e) => handleInputChange('blNo', e.target.value.toUpperCase())}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">
-                      <span>Shipping Line / Carrier *</span>
-                      <span className="dossier-helper-tag">
-                        <Sparkles size={11} /> Auto-loads free days & tariff rates
-                      </span>
-                    </label>
-                    <select
-                      className="dossier-input-control"
-                      style={{ fontWeight: 700 }}
-                      value={formData.shippingLine}
-                      onChange={(e) => handleShippingLineSelect(e.target.value)}
-                    >
-                      {shippingLinesList.map(l => (
-                        <option key={l.id} value={l.name}>
-                          {l.name} {l.scac ? `(${l.scac})` : ''}
-                        </option>
-                      ))}
-                      <option value="Other Line / NVOCC">Other Line / NVOCC</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Vessel Name</label>
-                    <input
-                      type="text"
-                      className="dossier-input-control"
-                      placeholder="e.g. AL ZUBARA"
-                      value={formData.vessel}
-                      onChange={(e) => handleInputChange('vessel', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Voyage Number</label>
-                    <input
-                      type="text"
-                      className="dossier-input-control mono"
-                      placeholder="e.g. 2604E"
-                      value={formData.voyage}
-                      onChange={(e) => handleInputChange('voyage', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: Ports & Inland Routing */}
-              <div className="dossier-group-card">
-                <div className="dossier-group-title">
-                  <MapPin size={16} color="#0891b2" />
-                  <span>2. Routing & Inland Delivery Destination</span>
-                </div>
-                <div className="dossier-grid-2">
-                  <div>
-                    <label className="dossier-field-label">Port of Loading (POL)</label>
-                    <input
-                      type="text"
-                      list="master-ports-list"
-                      className="dossier-input-control"
-                      placeholder="e.g. Hamburg Port (DEHAM)"
-                      value={formData.pol}
-                      onChange={(e) => handleInputChange('pol', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">
-                      <span>Port of Discharge (POD) *</span>
-                      <span className="dossier-helper-tag">
-                        <Sparkles size={11} /> Auto-sets terminal storage days
-                      </span>
-                    </label>
-                    <input
-                      required
-                      type="text"
-                      list="master-ports-list"
-                      className="dossier-input-control"
-                      style={{ fontWeight: 700 }}
-                      placeholder="e.g. Jebel Ali Port (AEJEA)"
-                      value={formData.pod}
-                      onChange={(e) => handlePodSelect(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="dossier-grid-full">
-                    <label className="dossier-field-label">
-                      <span>Final Inland Delivery Destination / Consignee Yard</span>
-                      <span className="dossier-helper-tag">Warehouse address</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="dossier-input-control"
-                      placeholder="e.g. Dubai Industrial City Yard, Warehouse 4"
-                      value={formData.finalDestination}
-                      onChange={(e) => handleInputChange('finalDestination', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 3: Commercial Parties */}
-              <div className="dossier-group-card">
-                <div className="dossier-group-title">
-                  <Building2 size={16} color="#059669" />
-                  <span>3. Commercial Parties (Consignee & Shipper)</span>
-                </div>
-                <div className="dossier-grid-2">
-                  <div>
-                    <label className="dossier-field-label">
-                      <span>Consignee (Importer) *</span>
-                      <span className="dossier-helper-tag">
-                        <Sparkles size={11} /> Auto-fills yard address
-                      </span>
-                    </label>
-                    <input
-                      required
-                      type="text"
-                      list="master-consignees-list"
-                      className="dossier-input-control"
-                      style={{ fontWeight: 700 }}
-                      placeholder="Select Master Consignee or type..."
-                      value={formData.consignee}
-                      onChange={(e) => handleConsigneeSelect(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Shipper (Exporter / Supplier)</label>
-                    <input
-                      type="text"
-                      list="master-shippers-list"
-                      className="dossier-input-control"
-                      placeholder="Select Master Shipper or type..."
-                      value={formData.shipper}
-                      onChange={(e) => handleInputChange('shipper', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 4: Cargo Specifications */}
-              <div className="dossier-group-card">
-                <div className="dossier-group-title">
-                  <Box size={16} color="#7c3aed" />
-                  <span>4. Cargo Specifications</span>
-                </div>
-                <div className="dossier-grid-2">
-                  <div className="dossier-grid-full">
-                    <label className="dossier-field-label">
-                      <span>Cargo Description</span>
-                      <span className="dossier-helper-tag">
-                        <Sparkles size={11} /> Auto-fills HS code & packaging
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      list="master-cargo-list"
-                      className="dossier-input-control"
-                      placeholder="Select from Master Cargo or type custom description..."
-                      value={formData.cargoDescription}
-                      onChange={(e) => handleCargoSelect(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Packaging & Total Packages</label>
-                    <input
-                      type="text"
-                      className="dossier-input-control"
-                      placeholder="e.g. 960 Bags / 24 Pallets"
-                      value={formData.totalPackages}
-                      onChange={(e) => handleInputChange('totalPackages', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Gross Weight (KG)</label>
-                    <input
-                      type="number"
-                      className="dossier-input-control"
-                      placeholder="e.g. 52140"
-                      value={formData.grossWeightKg}
-                      onChange={(e) => handleInputChange('grossWeightKg', e.target.value)}
-                    />
-                  </div>
-                </div>
+                <div className="bl-hint">Counted from the vessel discharge date plus the free days above.</div>
               </div>
             </div>
-          )}
+          </Section>
 
-          {/* TAB 2: DEMURRAGE & FREE TIME RULES */}
-          {activeTab === 'freetime' && (
-            <div>
-              {/* Visual Radar Calculation Box */}
-              <div className="freetime-radar-preview">
-                <div className="freetime-stat-box">
-                  <span>Discharge Date (Day 0)</span>
-                  <strong>{formatDate(formData.dischargeDate)}</strong>
-                  <small>Clocks start ticking upon vessel discharge</small>
-                </div>
-                <div className="freetime-stat-box">
-                  <span>Port Storage Expiry ({formData.portFreeDays || 5} Free Days)</span>
-                  <strong style={{ color: '#b45309' }}>{formatDate(portExpiryPreview)}</strong>
-                  <small>Terminal penalty: ${formData.portStorageDailyRate || 45}/box/day</small>
-                </div>
-                <div className="freetime-stat-box">
-                  <span>Empty Return Cutoff ({formData.lineFreeDays || 14} Free Days)</span>
-                  <strong style={{ color: '#047857' }}>{formatDate(lineExpiryPreview)}</strong>
-                  <small>Line detention: ${formData.lineDetentionDailyRate || 80}/box/day</small>
-                </div>
-              </div>
-
-              <div className="dossier-group-card">
-                <div className="dossier-group-title">
-                  <Calendar size={16} color="#2563eb" />
-                  <span>Vessel Milestones & Delivery Order Expiry</span>
-                </div>
-                <div className="dossier-grid-2">
-                  <div>
-                    <label className="dossier-field-label">Estimated Time of Arrival (ETA)</label>
-                    <input
-                      type="date"
-                      className="dossier-input-control"
-                      value={formData.eta}
-                      onChange={(e) => handleInputChange('eta', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Actual Time of Arrival (ATA)</label>
-                    <input
-                      type="date"
-                      className="dossier-input-control"
-                      value={formData.ata}
-                      onChange={(e) => handleInputChange('ata', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">
-                      <span>Vessel Discharge Date (Clock Start Day 0) *</span>
-                      <span className="dossier-helper-tag">Crucial milestone</span>
-                    </label>
-                    <input
-                      required
-                      type="date"
-                      className="dossier-input-control font-bold"
-                      value={formData.dischargeDate}
-                      onChange={(e) => handleInputChange('dischargeDate', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">
-                      <span>Delivery Order (DO) Validity Expiry Date</span>
-                      <span className="dossier-helper-tag">Watch for expiry</span>
-                    </label>
-                    <input
-                      type="date"
-                      className="dossier-input-control"
-                      value={formData.doValidityDate}
-                      onChange={(e) => handleInputChange('doValidityDate', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="dossier-group-card">
-                <div className="dossier-group-title">
-                  <ShieldAlert size={16} color="#d97706" />
-                  <span>Tariff Rules & Daily Penalty Slabs</span>
-                </div>
-                <div className="dossier-grid-2">
-                  <div>
-                    <label className="dossier-field-label">Port Terminal Free Storage Days</label>
-                    <input
-                      type="number"
-                      className="dossier-input-control"
-                      value={formData.portFreeDays}
-                      onChange={(e) => handleInputChange('portFreeDays', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Daily Port Storage Rate ($/box/day)</label>
-                    <input
-                      type="number"
-                      className="dossier-input-control"
-                      value={formData.portStorageDailyRate}
-                      onChange={(e) => handleInputChange('portStorageDailyRate', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Shipping Line Demurrage & Detention Free Days</label>
-                    <input
-                      type="number"
-                      className="dossier-input-control"
-                      value={formData.lineFreeDays}
-                      onChange={(e) => handleInputChange('lineFreeDays', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Daily Line Detention Rate ($/box/day)</label>
-                    <input
-                      type="number"
-                      className="dossier-input-control"
-                      value={formData.lineDetentionDailyRate}
-                      onChange={(e) => handleInputChange('lineDetentionDailyRate', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
+          <Section
+            {...sectionProps('deposit')}
+            step="4"
+            title="Shipping Line Container Security Deposit"
+            Icon={Coins}
+            meta={formData.doSecurityDeposit.amount ? '$' + formData.doSecurityDeposit.amount : ''}
+          >
+            <div className="bl-form-grid">
+              <Field
+                id="bl-deposit-amount"
+                label="Security Deposit Amount ($)"
+                inputMode="decimal"
+                value={formData.doSecurityDeposit.amount}
+                onChange={(value) => handleDepositChange('amount', value)}
+                placeholder="e.g. 2000"
+              />
+              <Select
+                id="bl-deposit-status"
+                label="Deposit Refund Status"
+                value={formData.doSecurityDeposit.status}
+                onChange={(value) => handleDepositChange('status', value)}
+                options={DEPOSIT_STATUSES}
+              />
+              <Field
+                id="bl-deposit-ref"
+                label="Guarantee / Receipt Ref #"
+                mono
+                value={formData.doSecurityDeposit.receiptNo}
+                onChange={(value) => handleDepositChange('receiptNo', value)}
+                placeholder="e.g. HL-DEP-99410"
+              />
             </div>
-          )}
+          </Section>
 
-          {/* TAB 3: CUSTOMS & DELIVERY ORDER */}
-          {activeTab === 'customs' && (
+          <Section
+            {...sectionProps('containers')}
+            step="5"
+            title="Container Details and Status"
+            Icon={Box}
+            meta={containerCount + ' unit(s)'}
+          >
             <div>
-              <div className="dossier-group-card">
-                <div className="dossier-group-title">
-                  <DollarSign size={16} color="#2563eb" />
-                  <span>Customs Declaration Assessment & Channel Routing</span>
-                </div>
-                <div className="dossier-grid-2">
-                  <div>
-                    <label className="dossier-field-label">Current Customs Clearance Milestone</label>
-                    <select
-                      className="dossier-input-control font-bold"
-                      value={formData.customsStatus}
-                      onChange={(e) => handleInputChange('customsStatus', e.target.value)}
-                    >
-                      <option value="Pre-Arrival">Pre-Arrival</option>
-                      <option value="DO Taken">DO Taken / Issued</option>
-                      <option value="Declaration Filed">Customs Declaration Filed</option>
-                      <option value="Under Inspection">Under Inspection / Lab Test</option>
-                      <option value="Duty Paid">Duty Paid</option>
-                      <option value="Customs Cleared">Customs Cleared (OOC)</option>
-                      <option value="Gate Out">Gate Out / Dispatched</option>
-                      <option value="Delivered">Delivered at Consignee</option>
-                      <option value="Empties Returned">Empties Returned (Closed)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Inspection / Regulatory Channel</label>
-                    <select
-                      className="dossier-input-control"
-                      value={formData.inspectionType}
-                      onChange={(e) => handleInputChange('inspectionType', e.target.value)}
-                    >
-                      <option value="None">None (Standard)</option>
-                      <option value="Green Channel (Direct Release)">Green Channel (Direct Document Release)</option>
-                      <option value="Yellow (Assessment / Document Audit)">Yellow Channel (Documentary Audit)</option>
-                      <option value="Red (Physical & Customs Lab Sampling)">Red Channel (Physical Exam & Scanner)</option>
-                      <option value="Ministry / Food / Health Approval">Special Agency (Food / Health / Municipality)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Customs Declaration (Bill of Entry) Number</label>
-                    <input
-                      type="text"
-                      className="dossier-input-control mono"
-                      placeholder="e.g. DXB-CUST-883921"
-                      value={formData.customsDeclarationNo}
-                      onChange={(e) => handleInputChange('customsDeclarationNo', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Declaration Filing Date</label>
-                    <input
-                      type="date"
-                      className="dossier-input-control"
-                      value={formData.customsDeclarationDate}
-                      onChange={(e) => handleInputChange('customsDeclarationDate', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Harmonized Tariff (HS) Code</label>
-                    <input
-                      type="text"
-                      className="dossier-input-control mono font-bold"
-                      placeholder="e.g. 3902.10.00"
-                      value={formData.hsCode}
-                      onChange={(e) => handleInputChange('hsCode', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="dossier-grid-2">
-                    <div>
-                      <label className="dossier-field-label">Customs Duty ($)</label>
-                      <input
-                        type="number"
-                        className="dossier-input-control"
-                        placeholder="e.g. 2607"
-                        value={formData.customsDutyAmount}
-                        onChange={(e) => handleInputChange('customsDutyAmount', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="dossier-field-label">VAT / Tax ($)</label>
-                      <input
-                        type="number"
-                        className="dossier-input-control"
-                        placeholder="e.g. 2737"
-                        value={formData.customsVatAmount}
-                        onChange={(e) => handleInputChange('customsVatAmount', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Shipping Line Security Deposit Guarantee */}
-              <div className="dossier-group-card">
-                <div className="dossier-group-title">
-                  <Coins size={16} color="#059669" />
-                  <span>Shipping Line Container Security Deposit Tracking</span>
-                </div>
-                <div className="dossier-grid-3">
-                  <div>
-                    <label className="dossier-field-label">Security Deposit Amount ($)</label>
-                    <input
-                      type="number"
-                      className="dossier-input-control"
-                      placeholder="e.g. 2000"
-                      value={formData.doSecurityDeposit.amount}
-                      onChange={(e) => handleDepositChange('amount', e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Deposit Refund Status</label>
-                    <select
-                      className="dossier-input-control font-bold"
-                      value={formData.doSecurityDeposit.status}
-                      onChange={(e) => handleDepositChange('status', e.target.value)}
-                    >
-                      <option value="None">None Required</option>
-                      <option value="Deposited">Deposited (Awaiting Empty Return)</option>
-                      <option value="Claimed">Refund Claim Submitted</option>
-                      <option value="Refunded">Refund Received</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="dossier-field-label">Guarantee / Receipt Ref #</label>
-                    <input
-                      type="text"
-                      className="dossier-input-control mono"
-                      placeholder="e.g. HL-DEP-99410"
-                      value={formData.doSecurityDeposit.receiptNo}
-                      onChange={(e) => handleDepositChange('receiptNo', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Operational Remarks */}
-              <div className="dossier-group-card">
-                <label className="dossier-field-label">Operational Notes & Clearing Instructions</label>
-                <textarea
-                  rows={2}
-                  className="dossier-input-control"
-                  placeholder="Inspector instructions, sampling laboratory remarks, truck token slots..."
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: CONTAINERS REPEATER */}
-          {activeTab === 'containers' && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-                <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Container Equipment Manifest ({formData.containers.length} Units)
-                  </h3>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
-                    Track individual container discharge, gate-out, delivery, and depot EIR return dates.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={addContainerRow}
-                  className="btn btn-primary btn-sm"
-                >
-                  <Plus size={15} />
-                  <span>Add Container Box</span>
-                </button>
-              </div>
-
-              {formData.containers.map((cont, index) => (
-                <div key={cont.id || index} className="container-repeater-card">
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="brand-badge" style={{ background: '#dbeafe', color: '#1e40af', borderColor: '#93c5fd' }}>
-                        Unit #{index + 1}
-                      </span>
-                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', color: '#0f172a' }}>
-                        {cont.containerNo || 'Pending Container #'}
-                      </strong>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeContainerRow(index)}
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                      title="Delete Container Unit"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-
-                  <div className="dossier-grid-4">
-                    <div>
-                      <label className="dossier-field-label">Container Number *</label>
-                      <input
-                        required
-                        type="text"
-                        className="dossier-input-control mono font-bold uppercase"
-                        placeholder="e.g. FSCU8083274"
-                        value={cont.containerNo}
-                        onChange={(e) => handleContainerChange(index, 'containerNo', e.target.value.toUpperCase())}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="dossier-field-label">Size / ISO Type</label>
-                      <select
-                        className="dossier-input-control font-semibold"
-                        value={cont.sizeType}
-                        onChange={(e) => handleContainerChange(index, 'sizeType', e.target.value)}
+              {formData.containers.map((container, index) => (
+                <div key={container.id || index} className="bl-container-card">
+                  <div className="bl-container-head">
+                    <span className="bl-container-unit">
+                      Unit #{index + 1}
+                      {container.containerNo ? ' - ' + container.containerNo : ' - Pending Container #'}
+                    </span>
+                    {formData.containers.length > 1 ? (
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm btn-icon-only"
+                        onClick={() => removeContainerRow(index)}
+                        title={'Remove unit #' + (index + 1)}
                       >
-                        <option value="20GP">20' General Purpose</option>
-                        <option value="40GP">40' General Purpose</option>
-                        <option value="40HC">40' High Cube</option>
-                        <option value="45HC">45' High Cube</option>
-                        <option value="20RF">20' Reefer</option>
-                        <option value="40RF">40' Reefer</option>
-                        <option value="20OT">20' Open Top</option>
-                        <option value="40OT">40' Open Top</option>
-                        <option value="40FR">40' Flat Rack</option>
-                      </select>
-                    </div>
+                        <Trash2 size={14} />
+                      </button>
+                    ) : null}
+                  </div>
 
-                    <div>
-                      <label className="dossier-field-label">Seal Number</label>
-                      <input
-                        type="text"
-                        className="dossier-input-control mono"
-                        placeholder="e.g. HL773192"
-                        value={cont.sealNo}
-                        onChange={(e) => handleContainerChange(index, 'sealNo', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="dossier-field-label">Current Unit Status</label>
-                      <select
-                        className="dossier-input-control font-bold"
-                        value={cont.status}
-                        onChange={(e) => handleContainerChange(index, 'status', e.target.value)}
-                      >
-                        <option value="At Port (Full)">At Port (Full)</option>
-                        <option value="Gate Out (In Transit)">Gate Out (In Transit)</option>
-                        <option value="At Consignee (Unloading)">At Consignee (Unloading)</option>
-                        <option value="Empty Returned (Safe)">Empty Returned (Safe)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="dossier-field-label">Port Gate-Out Date</label>
-                      <input
-                        type="date"
-                        className="dossier-input-control"
-                        value={cont.gateOutDate}
-                        onChange={(e) => handleContainerChange(index, 'gateOutDate', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="dossier-field-label">Empty Return Depot</label>
-                      <input
-                        type="text"
-                        list="master-depots-list"
-                        className="dossier-input-control"
-                        placeholder="Select Master Depot or type..."
-                        value={cont.emptyReturnDepot}
-                        onChange={(e) => handleContainerChange(index, 'emptyReturnDepot', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="dossier-field-label">Empty Return Date</label>
-                      <input
-                        type="date"
-                        className="dossier-input-control font-bold"
-                        style={{ color: '#047857' }}
-                        value={cont.emptyReturnDate}
-                        onChange={(e) => handleContainerChange(index, 'emptyReturnDate', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="dossier-field-label">EIR Receipt #</label>
-                      <input
-                        type="text"
-                        className="dossier-input-control mono font-bold"
-                        placeholder="e.g. EIR-881923"
-                        value={cont.eirNumber}
-                        onChange={(e) => handleContainerChange(index, 'eirNumber', e.target.value)}
-                      />
-                    </div>
+                  <div className="bl-form-grid">
+                    <Field
+                      id={'cont-no-' + index}
+                      label="Container Number"
+                      required
+                      mono
+                      value={container.containerNo}
+                      onChange={(value) => handleContainerChange(index, 'containerNo', value.toUpperCase())}
+                      placeholder="e.g. FSCU8083274"
+                    />
+                    <Select
+                      id={'cont-size-' + index}
+                      label="Size / ISO Type"
+                      value={container.sizeType}
+                      onChange={(value) => handleContainerChange(index, 'sizeType', value)}
+                      options={CONTAINER_SIZES}
+                    />
+                    <Field
+                      id={'cont-seal-' + index}
+                      label="Seal Number"
+                      mono
+                      value={container.sealNo}
+                      onChange={(value) => handleContainerChange(index, 'sealNo', value)}
+                      placeholder="e.g. HL773192"
+                    />
+                    <Select
+                      id={'cont-status-' + index}
+                      label="Current Unit Status"
+                      value={container.status}
+                      onChange={(value) => handleContainerChange(index, 'status', value)}
+                      options={CONTAINER_STATUSES}
+                    />
+                    <Field
+                      id={'cont-gateout-' + index}
+                      type="date"
+                      label="Port Gate-Out Date"
+                      value={container.gateOutDate}
+                      onChange={(value) => handleContainerChange(index, 'gateOutDate', value)}
+                    />
+                    <Field
+                      id={'cont-depot-' + index}
+                      listId="master-depots"
+                      label="Empty Return Depot"
+                      value={container.emptyReturnDepot}
+                      onChange={(value) => handleContainerChange(index, 'emptyReturnDepot', value)}
+                      placeholder="Select master depot or type..."
+                    />
+                    <Field
+                      id={'cont-return-' + index}
+                      type="date"
+                      label="Empty Return Date"
+                      value={container.emptyReturnDate}
+                      onChange={(value) => handleContainerChange(index, 'emptyReturnDate', value)}
+                    />
+                    <Field
+                      id={'cont-eir-' + index}
+                      label="EIR Receipt #"
+                      mono
+                      value={container.eirNumber}
+                      onChange={(value) => handleContainerChange(index, 'eirNumber', value)}
+                      placeholder="e.g. EIR-881923"
+                    />
                   </div>
                 </div>
               ))}
-            </div>
-          )}
 
-          {/* TAB 5: DOCUMENT AUDIT CHECKLIST */}
-          {activeTab === 'documents' && (
+              <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: '0.8rem' }} onClick={addContainerRow}>
+                <Plus size={14} />
+                <span>Add Container Box</span>
+              </button>
+            </div>
+          </Section>
+
+          <Section
+            {...sectionProps('attachments')}
+            step="6"
+            title="BL Consignment Attachments"
+            Icon={Paperclip}
+            meta={
+              [formData.blDocuments?.blDraft, formData.blDocuments?.originalBL].filter(Boolean).length + ' of 2 attached'
+            }
+          >
             <div>
-              {/* BL Consignment Attachments: BL Draft + Original BL */}
-              <div style={{ marginBottom: '1.75rem' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  BL Consignment Attachments
-                </h3>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0.9rem' }}>
-                  Attach the BL draft, the original BL, or both. Images (JPG, PNG, WebP) and PDF files are accepted and
-                  automatically compressed to under 150 KB before being uploaded to Firebase Storage.
-                </p>
-                <div className="bl-attach-grid">
-                  {BL_ATTACHMENT_SLOTS.map(({ key, label, hint }) => (
-                    <BlAttachmentUpload
-                      key={key}
-                      slot={key}
-                      label={label}
-                      hint={hint}
-                      value={formData.blDocuments?.[key] || null}
-                      companyId={companyId}
-                      shipmentId={formData.id}
-                      user={currentUser}
-                      onChange={(attachment) => handleBlAttachmentChange(key, attachment)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-                <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Customs Clearance Document Audit Checklist
-                  </h3>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '2px 0 0' }}>
-                    Verify trade documents to avoid regulatory holds and clearance bottlenecks.
-                  </p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '0.825rem', fontWeight: 800, color: '#2563eb' }}>
-                    {verifiedDocCount} of 10 Verified ({verifiedDocCount * 10}%)
-                  </span>
-                  <div style={{ width: '130px', height: '6px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginTop: '4px' }}>
-                    <div style={{ width: `${verifiedDocCount * 10}%`, height: '100%', background: '#059669', transition: 'width 250ms ease' }}></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="checklist-tiles-grid">
-                {[
-                  { key: 'commercialInvoice', label: 'Commercial Invoice (Attested & Signed)' },
-                  { key: 'packingList', label: 'Packing List (Itemized Net/Gross Weight)' },
-                  { key: 'originalBL', label: 'Original Bill of Lading (or Seaway / Telex Release)' },
-                  { key: 'certificateOfOrigin', label: 'Certificate of Origin (Chamber Legalized)' },
-                  { key: 'formEFTA', label: 'Preferential Tariff Exemption (Form E / FTA)' },
-                  { key: 'deliveryOrder', label: 'Shipping Line Delivery Order (DO) Issued' },
-                  { key: 'customsDeclaration', label: 'Bill of Entry / Customs Declaration Draft' },
-                  { key: 'dutyPaymentReceipt', label: 'Customs Duty & VAT Payment Receipt' },
-                  { key: 'portGatePass', label: 'Port THC & Gate Pass Token Booked' },
-                  { key: 'emptyReturnEIR', label: 'Empty Return EIR Receipt from Depot' }
-                ].map(({ key, label }) => {
-                  const isChecked = !!formData.documents[key];
-
-                  return (
-                    <div
-                      key={key}
-                      onClick={() => handleDocumentToggle(key)}
-                      className={`checklist-tile ${isChecked ? 'checked' : ''}`}
-                    >
-                      <div className="checklist-checkbox-circle">
-                        {isChecked && <Check size={13} strokeWidth={3} />}
-                      </div>
-                      <span style={{ fontSize: '0.8125rem', fontWeight: isChecked ? 700 : 500 }}>
-                        {label}
-                      </span>
-                    </div>
-                  );
-                })}
+              <p className="bl-hint" style={{ marginBottom: '0.7rem' }}>
+                Attach the BL draft, the original BL, or both. Images (JPG, PNG, WebP) and PDF files are accepted and
+                automatically compressed to under 150 KB before being uploaded to Firebase Storage.
+              </p>
+              <div className="bl-attach-grid">
+                {BL_ATTACHMENT_SLOTS.map((slot) => (
+                  <BlAttachmentUpload
+                    key={slot.key}
+                    slot={slot.key}
+                    label={slot.label}
+                    hint={slot.hint}
+                    value={formData.blDocuments?.[slot.key] || null}
+                    companyId={companyId}
+                    shipmentId={formData.id}
+                    user={currentUser}
+                    onChange={(attachment) => handleBlAttachmentChange(slot.key, attachment)}
+                  />
+                ))}
               </div>
             </div>
-          )}
-
-          {/* Modal Bottom Footer Navigation */}
-          <div className="dossier-footer-nav" style={{ marginTop: '2rem' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn btn-outline"
-              >
-                Cancel
-              </button>
-              {currentTabIndex > 0 && (
-                <button
-                  type="button"
-                  onClick={handlePrevTab}
-                  className="btn btn-outline"
-                >
-                  <ArrowLeft size={15} />
-                  <span>Previous</span>
-                </button>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {currentTabIndex < TABS.length - 1 && (
-                <button
-                  type="button"
-                  onClick={handleNextTab}
-                  className="btn btn-outline"
-                  style={{ borderColor: '#cbd5e1' }}
-                >
-                  <span>Next Step</span>
-                  <ArrowRight size={15} />
-                </button>
-              )}
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ padding: '10px 22px' }}
-              >
-                <Save size={16} />
-                <span>Save Shipment Dossier</span>
-              </button>
-            </div>
-          </div>
+          </Section>
         </form>
       </div>
+
+      <footer className="bl-form-footer">
+        <span className="bl-hint" style={{ marginTop: 0 }}>
+          Fields marked <span className="req">*</span> are required.
+        </span>
+        <div className="bl-form-actions">
+          <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-primary" onClick={handleSubmit}>
+            <Save size={15} />
+            <span>Save BL Consignment</span>
+          </button>
+        </div>
+      </footer>
     </div>
   );
 };
+
+export default ShipmentModal;

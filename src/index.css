@@ -815,6 +815,370 @@
   margin: 0.6rem 0 1.25rem;
 }
 
+/* ===================================================
+   Full-Page BL Consignment Form (single page, accordion sections)
+   =================================================== */
+.bl-form-page {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: var(--bg-app);
+  display: flex;
+  flex-direction: column;
+  animation: fade-in 150ms ease-out;
+}
+
+.bl-form-header {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #091224 0%, #0f1c3f 55%, #162a5b 100%);
+  color: #ffffff;
+  padding: 0.8rem 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.bl-form-header h2 {
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.bl-form-header p {
+  color: #93a4bd;
+  font-size: 0.72rem;
+  margin: 3px 0 0;
+}
+
+.bl-form-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.9rem 1.1rem 1.5rem;
+}
+
+.bl-form-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.bl-form-footer {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 0.7rem 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* Collapsible section */
+.bl-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.bl-section-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.7rem 0.95rem;
+  background: #f8fafc;
+  border: none;
+  border-bottom: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.bl-section-head:hover {
+  background: #f1f5f9;
+}
+
+.bl-section.open .bl-section-head {
+  border-bottom-color: var(--border);
+}
+
+.bl-step-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--blue-600);
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bl-section-title {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.bl-section-meta {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.bl-section-body {
+  padding: 0.9rem 0.95rem 1.05rem;
+}
+
+/* Field grid */
+.bl-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.bl-field-full {
+  grid-column: 1 / -1;
+}
+
+.bl-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+}
+
+.bl-label .req {
+  color: var(--rose-600);
+}
+
+.bl-input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: #ffffff;
+  color: var(--text-primary);
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.bl-input:focus {
+  border-color: var(--blue-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.bl-input.mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.bl-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* Free-time day counters */
+.bl-days-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 0.2rem;
+}
+
+.bl-days-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.bl-days-chip.safe {
+  background: var(--emerald-50);
+  color: #065f46;
+  border-color: var(--emerald-200);
+}
+
+.bl-days-chip.warn {
+  background: var(--amber-50);
+  color: #92400e;
+  border-color: var(--amber-200);
+}
+
+.bl-days-chip.over {
+  background: var(--rose-50);
+  color: #9f1239;
+  border-color: var(--rose-200);
+}
+
+.bl-days-chip.muted {
+  background: #f1f5f9;
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+/* Container cards */
+.bl-container-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.8rem;
+  background: #fbfdff;
+}
+
+.bl-container-card + .bl-container-card {
+  margin-top: 0.75rem;
+}
+
+.bl-container-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 0.7rem;
+}
+
+.bl-container-unit {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--blue-700);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bl-error-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--rose-50);
+  border: 1px solid var(--rose-200);
+  color: #9f1239;
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .bl-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile: single column, comfortable tap targets, sticky full-width actions */
+@media (max-width: 700px) {
+  .bl-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .bl-form-header {
+    padding: 0.7rem 0.85rem;
+  }
+
+  .bl-form-header h2 {
+    font-size: 0.95rem;
+  }
+
+  .bl-form-header p,
+  .bl-section-meta {
+    display: none;
+  }
+
+  .bl-form-body {
+    padding: 0.7rem 0.75rem 1.25rem;
+  }
+
+  .bl-section-body {
+    padding: 0.8rem 0.75rem 0.9rem;
+  }
+
+  .bl-input {
+    padding: 11px 12px;
+    font-size: 16px; /* prevents iOS zoom-on-focus */
+  }
+
+  .bl-form-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+    padding: 0.7rem 0.75rem calc(0.7rem + env(safe-area-inset-bottom));
+  }
+
+  .bl-form-footer .btn {
+    width: 100%;
+  }
+
+  .bl-form-actions {
+    width: 100%;
+    flex-direction: column-reverse;
+  }
+
+  .bl-form-actions .btn {
+    width: 100%;
+    flex-shrink: 0;
+  }
+
+  /* Dossier: single column facts, wrapped header actions */
+  .dossier-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dossier-header-actions {
+    gap: 6px;
+  }
+
+  .dossier-header-actions .btn {
+    padding: 7px 10px;
+    font-size: 0.78rem;
+  }
+}
+
+/* Live dossier reuses the full-page shell, centred without an extra wrapper */
+.dossier-body {
+  padding-left: max(1.1rem, calc((100% - 1180px) / 2));
+  padding-right: max(1.1rem, calc((100% - 1180px) / 2));
+}
+
+.dossier-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Footer action group: side by side on desktop, stacked full width on mobile */
+.bl-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* BL Attachment Upload (BL Draft / Original BL) */
 .bl-attach-grid {
   display: grid;
@@ -1271,6 +1635,23 @@
   height: 1px;
   background: rgba(255, 255, 255, 0.08);
   margin: 6px 4px;
+}
+
+/* Maintenance badge on temporarily locked menu entries */
+.menu-lock-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  white-space: nowrap;
 }
 
 /* ===================================================

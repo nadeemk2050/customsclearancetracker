@@ -496,6 +496,7 @@ export function App() {
         shipment={dossierShipment}
         onEdit={handleEditShipment}
         onUpdateStatus={handleQuickUpdateStatus}
+        companyName={session?.companyName || 'CustomsTrack PRO'}
       />
 
       {/* Backup & Archival Modal */}
