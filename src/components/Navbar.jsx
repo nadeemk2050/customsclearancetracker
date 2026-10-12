@@ -360,10 +360,11 @@ export const Navbar = ({
                   letterSpacing: '0.02em',
                   boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)'
                 }}
+                className="nav-company-chip"
                 title={`Active Customs House Agent Account: ${companyName}`}
               >
                 <Building2 size={13} color="#38bdf8" />
-                <span>{companyName}</span>
+                <span className="nav-company-name">{companyName}</span>
               </div>
             </div>
           </div>
@@ -388,6 +389,7 @@ export const Navbar = ({
           {/* Offline-First Bidirectional Sync Status Chip */}
           <div 
             onClick={handleManualSyncClick}
+            className="nav-sync-chip"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -415,15 +417,15 @@ export const Navbar = ({
           >
             <HardDrive size={12} color="#38bdf8" />
             {(isSyncing || syncStatus.status === 'syncing') ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span className="nav-sync-text" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <RefreshCw size={11} className="animate-spin" /> Syncing...
               </span>
             ) : syncStatus.status === 'offline' ? (
-              <span>Offline (Local-First Active)</span>
+              <span className="nav-sync-text">Offline (Local-First Active)</span>
             ) : (syncStatus.metrics?.queueDepth > 0) ? (
-              <span>{syncStatus.metrics.queueDepth} Queued (Syncing...)</span>
+              <span className="nav-sync-text">{syncStatus.metrics.queueDepth} Queued (Syncing...)</span>
             ) : (
-              <span>🟢 Live Synced (Local-First)</span>
+              <span className="nav-sync-text">🟢 Live Synced (Local-First)</span>
             )}
           </div>
 
@@ -462,7 +464,9 @@ export const Navbar = ({
             )}
 
             {/* Active User Info & Sign Out */}
-            <div style={{
+            <div 
+              className="nav-user-chip"
+              style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -485,7 +489,7 @@ export const Navbar = ({
               }}>
                 {currentSession?.isDeveloper ? '⚡' : displayName.charAt(0).toUpperCase()}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+              <div className="nav-user-text" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f8fafc' }}>
                   {displayName}
                 </span>
@@ -500,10 +504,11 @@ export const Navbar = ({
           <button
             id="btn-add-shipment"
             onClick={onOpenNewModal}
-            className="btn btn-primary btn-sm ml-1"
+            className="btn btn-primary btn-sm ml-1 nav-cta"
           >
             <PlusCircle size={16} />
-            <span>New Shipment BL</span>
+            <span className="nav-cta-full">New Shipment BL</span>
+            <span className="nav-cta-short">New BL</span>
           </button>
         </div>
       </div>

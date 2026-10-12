@@ -2148,6 +2148,456 @@
   }
 }
 
+/* ===================================================
+   Responsive / Mobile adaptations
+   =================================================== */
+
+/* Mobile-only card list for the dossiers table */
+.shipment-card-list {
+  display: none;
+}
+
+.hidden-on-mobile {
+  display: block;
+}
+
+.nav-cta-short {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  /* Never allow page-level sideways scrolling */
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  .hidden-on-mobile {
+    display: none !important;
+  }
+
+  .shipment-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+
+  .shipment-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 0.85rem;
+  }
+
+  .shipment-card-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+    padding: 2.5rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .shipment-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .shipment-card-facts {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 0.8rem;
+  }
+
+  .shipment-card-facts > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.8rem;
+  }
+
+  .shipment-card-facts span {
+    flex-shrink: 0;
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+  }
+
+  .shipment-card-facts strong {
+    font-weight: 600;
+    text-align: right;
+    color: var(--text-primary);
+    word-break: break-word;
+  }
+
+  .shipment-card-facts em {
+    display: block;
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+  }
+
+  .shipment-card-clocks {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--border);
+  }
+
+  .shipment-card-clocks .lbl {
+    display: inline-block;
+    min-width: 92px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .shipment-card-containers {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--border);
+  }
+
+  .shipment-card-container {
+    background: #fbfdff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem;
+  }
+
+  .shipment-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .shipment-card-actions .btn {
+    min-height: 38px;
+  }
+
+  /* Navbar collapses into a compact two-row bar */
+  .navbar-inner {
+    height: auto;
+    min-height: 56px;
+    padding: 0.55rem 0.7rem;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .brand-section {
+    flex: 1 1 100%;
+    min-width: 0;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  .brand-title-wrap {
+    min-width: 0;
+  }
+
+  .brand-title-wrap h1 {
+    font-size: 1rem;
+  }
+
+  .brand-icon-box {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  .nav-company-chip {
+    max-width: 100%;
+    padding: 2px 8px !important;
+    font-size: 0.66rem !important;
+  }
+
+  .nav-company-name {
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nav-actions {
+    flex: 1 1 100%;
+    width: 100%;
+    gap: 6px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .nav-tab-btn {
+    padding: 7px 10px;
+    font-size: 0.78rem;
+  }
+
+  .nav-sync-chip {
+    padding: 4px 8px !important;
+  }
+
+  .nav-sync-text {
+    display: none !important;
+  }
+
+  .nav-user-chip {
+    padding: 3px 6px 3px 4px !important;
+    gap: 6px !important;
+  }
+
+  .nav-user-text {
+    display: none !important;
+  }
+
+  .nav-cta-full {
+    display: none;
+  }
+
+  .nav-cta-short {
+    display: inline;
+  }
+
+  .nav-cta {
+    margin-left: auto;
+  }
+
+  /* Menus and modals use the full width */
+  .menu-dropdown-box {
+    width: calc(100vw - 1.4rem) !important;
+    max-width: 320px;
+  }
+
+  .modal-overlay,
+  .modal-backdrop {
+    padding: 0 !important;
+    align-items: flex-start !important;
+  }
+
+  .modal-box,
+  .modal-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+  }
+
+  /* Notices and filters stack comfortably */
+  .app-container {
+    padding: 0 0.7rem;
+  }
+
+  .control-panel {
+    padding: 0.6rem 0.7rem;
+  }
+
+  .search-filter-row > * {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .search-filter-row .filter-select,
+  .search-filter-row .search-input-wrap,
+  .search-filter-row .btn {
+    width: 100%;
+  }
+
+  .kpi-strip-bar {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .kpi-chip {
+    min-height: 38px;
+    padding: 6px 10px;
+  }
+
+  /* Brand row: let the company chip drop to its own line instead of squeezing the title */
+  .brand-title-wrap > div {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .brand-title-wrap h1 {
+    white-space: nowrap;
+    font-size: 0.98rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* One scrollable action row instead of three stacked rows */
+  .nav-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+  }
+
+  .nav-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .preset-pill {
+    height: 24px;
+    font-size: 0.7rem;
+  }
+
+  /* Tables stay readable: compact cells, smooth touch scrolling */
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table {
+    font-size: 0.78rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 8px 9px;
+  }
+
+  .masters-table-wrap,
+  .dossier-body {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .masters-table th,
+  .masters-table td {
+    padding: 7px 8px;
+    font-size: 0.75rem;
+  }
+
+  /* Milestone stepper becomes a swipeable strip */
+  .milestone-stepper {
+    overflow-x: auto;
+    padding-bottom: 10px;
+    gap: 0.6rem;
+  }
+
+  .step-label {
+    font-size: 0.6rem;
+  }
+
+  /* Comfortable tapping everywhere */
+  .btn {
+    min-height: 38px;
+  }
+
+  .btn-sm {
+    min-height: 34px;
+  }
+
+  .btn-icon-only {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 620px) {
+  /* Two compact rows of chips with the label above the value, so nothing truncates */
+  .kpi-strip-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi-chip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-height: 46px;
+  }
+
+  .chip-label,
+  .chip-value {
+    max-width: 100%;
+  }
+
+  .navbar-inner {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .brand-icon-box {
+    width: 30px;
+    height: 30px;
+  }
+
+  .hamburger-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .nav-tab-btn {
+    padding: 6px 9px;
+    font-size: 0.74rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .brand-title-wrap h1 {
+    font-size: 0.88rem;
+  }
+
+  .nav-company-name {
+    max-width: 108px;
+  }
+
+  .nav-tab-btn {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 340px) {
+  /* Only the narrowest screens need one chip per row */
+  .kpi-strip-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .shipment-card-facts > div {
+    align-items: flex-start;
+  }
+
+  .dossier-header-actions {
+    width: 100%;
+  }
+
+  .dossier-header-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* ===================================================
+   End responsive block
+   =================================================== */
+
 /* Global Modal System Styles */
 .modal-overlay,
 .modal-backdrop {
@@ -2182,4 +2632,93 @@
   overflow: hidden !important;
   z-index: 100000 !important;
   margin: auto !important;
+}
+
+/* ===================================================
+   Login screen: stack the brand panel above the form on small screens
+   =================================================== */
+@media (max-width: 860px) {
+  .login-page {
+    padding: 0 !important;
+    align-items: flex-start !important;
+  }
+
+  .login-shell {
+    grid-template-columns: minmax(0, 1fr) !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    min-height: 100vh;
+  }
+
+  .login-shell > div:first-child {
+    padding: 1.5rem 1.25rem !important;
+  }
+
+  .login-shell > div:last-child {
+    padding: 1.25rem !important;
+  }
+
+  /* Keep the sign-in form within reach: trim the promotional panel */
+  .login-features {
+    display: none !important;
+  }
+
+  .login-shell > div:first-child p {
+    margin-bottom: 0 !important;
+    font-size: 0.82rem !important;
+  }
+
+  .login-shell > div:first-child h1 {
+    font-size: 1.15rem !important;
+  }
+}
+
+/* ===================================================
+   Mobile overrides for the global modal system
+   (kept last so they win over the !important rules above)
+   =================================================== */
+@media (max-width: 760px) {
+  .modal-overlay,
+  .modal-backdrop {
+    /* 100vw includes the scrollbar and caused sideways scroll */
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    align-items: flex-start !important;
+    justify-content: stretch !important;
+  }
+
+  .modal-box,
+  .modal-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  .modal-header {
+    padding: 0.9rem 0.9rem;
+  }
+
+  .modal-header h2,
+  .modal-header h3 {
+    font-size: 0.95rem;
+    line-height: 1.3;
+  }
+
+  .modal-body {
+    padding: 0.9rem;
+  }
+
+  .modal-footer {
+    padding: 0.75rem 0.9rem calc(0.75rem + env(safe-area-inset-bottom));
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .modal-footer .btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+  }
 }

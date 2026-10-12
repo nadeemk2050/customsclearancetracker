@@ -109,7 +109,8 @@ export const ShipmentTable = ({
   };
 
   return (
-    <div className="table-card">
+    <>
+    <div className="table-card hidden-on-mobile">
       <div className="table-responsive">
         <table className="data-table">
           <thead>
@@ -430,5 +431,173 @@ export const ShipmentTable = ({
         </table>
       </div>
     </div>
+
+    {/* Mobile card list (shown instead of the table on small screens) */}
+    <div className="shipment-card-list">
+      {shipments.length === 0 ? (
+        <div className="shipment-card-empty">
+          <Box size={32} className="text-slate-300" />
+          <p className="font-semibold text-slate-600">No shipments matched your search criteria.</p>
+          <p className="text-xs text-slate-400">Try clearing your filters or add a new Bill of Lading.</p>
+        </div>
+      ) : (
+        shipments.map((shipment) => {
+          const metrics = calculateDetentionMetrics(shipment);
+          const containers = shipment.containers || [];
+          const nextStage = NEXT_STAGE_MAP[shipment.customsStatus];
+
+          return (
+            <article key={shipment.id} className="shipment-card">
+              <div className="shipment-card-top">
+                <div style={{ minWidth: 0 }}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="bl-badge" onClick={() => onViewDossier(shipment)}>{shipment.blNo}</span>
+                    <button
+                      onClick={() => handleCopy(shipment.blNo, shipment.id)}
+                      className="text-slate-400 p-0.5"
+                      title="Copy BL Number"
+                    >
+                      {copiedId === shipment.id ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                    </button>
+                  </div>
+                  <div className="carrier-tag">
+                    <Ship size={11} />
+                    <span>{shipment.shippingLine || 'Carrier TBD'}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    {shipment.vessel ? `${shipment.vessel} / ${shipment.voyage || ''}` : 'Vessel TBD'}
+                  </div>
+                </div>
+
+                <select
+                  className={`text-xs font-bold rounded-full px-2.5 py-1 border cursor-pointer outline-none ${getStatusBadgeClass(shipment.customsStatus)}`}
+                  value={shipment.customsStatus}
+                  onChange={(e) => onQuickUpdateStatus(shipment, e.target.value)}
+                  aria-label="Customs stage"
+                >
+                  <option value="Pre-Arrival">Pre-Arrival</option>
+                  <option value="DO Taken">DO Taken</option>
+                  <option value="Declaration Filed">Declaration Filed</option>
+                  <option value="Under Inspection">Under Inspection</option>
+                  <option value="Duty Paid">Duty Paid</option>
+                  <option value="Customs Cleared">Customs Cleared</option>
+                  <option value="Gate Out">Gate Out</option>
+                  <option value="Delivered">Delivered</option>
+                  <option value="Empties Returned">Empties Returned</option>
+                </select>
+              </div>
+
+              <div className="shipment-card-facts">
+                <div>
+                  <span>Consignee</span>
+                  <strong>{shipment.consignee || '—'}</strong>
+                </div>
+                <div>
+                  <span>Port of discharge</span>
+                  <strong>{shipment.pod || '—'}</strong>
+                </div>
+                <div>
+                  <span>Cargo</span>
+                  <strong>
+                    {shipment.cargoDescription || '—'}
+                    {shipment.hsCode ? <em>HS {shipment.hsCode}</em> : null}
+                  </strong>
+                </div>
+                <div>
+                  <span>Containers</span>
+                  <strong>
+                    {containers.length} unit(s) · {metrics.containersAtPort} in port
+                  </strong>
+                </div>
+              </div>
+
+              <div className="shipment-card-clocks">
+                <div>
+                  <span className="lbl">Port storage</span>
+                  {renderRiskBadge(metrics.portDaysLeft, metrics.portStorageIncurred > 0, metrics.portStorageIncurred, 'Port')}
+                </div>
+                <div>
+                  <span className="lbl">Line D&amp;D</span>
+                  {renderRiskBadge(metrics.lineDaysLeft, metrics.lineDetentionIncurred > 0, metrics.lineDetentionIncurred, 'Line')}
+                </div>
+              </div>
+
+              {containers.length > 0 && (
+                <div className="shipment-card-containers">
+                  {containers.map((cont, idx) => {
+                    const isGatedOut = !!cont.gateOutDate;
+                    const isReturned = !!cont.emptyReturnDate;
+
+                    return (
+                      <div key={cont.id || idx} className="shipment-card-container">
+                        <div className="flex items-center justify-between gap-2">
+                          <strong className="font-mono text-xs text-blue-900">{cont.containerNo}</strong>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                            {cont.sizeType || '40HC'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">
+                          {isGatedOut ? `Gate out ${formatDate(cont.gateOutDate)}` : 'Still in port yard'}
+                          {' · '}
+                          {isReturned ? `Returned ${formatDate(cont.emptyReturnDate)}` : 'Empty pending'}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {!isGatedOut && (
+                            <button
+                              onClick={() => onQuickContainerReturn(shipment, cont.id, 'gateOut')}
+                              className="btn btn-outline btn-sm"
+                            >
+                              <Truck size={12} />
+                              <span>Gate Out</span>
+                            </button>
+                          )}
+                          {!isReturned && (
+                            <button
+                              onClick={() => onQuickContainerReturn(shipment, cont.id, 'emptyReturned')}
+                              className="btn btn-primary btn-sm"
+                            >
+                              <CheckCircle size={12} />
+                              <span>Empty Returned</span>
+                            </button>
+                          )}
+                          {isReturned && (
+                            <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                              <ShieldCheck size={13} /> Safe / Closed
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="shipment-card-actions">
+                {nextStage && (
+                  <button
+                    onClick={() => onQuickUpdateStatus(shipment, nextStage.next)}
+                    className="btn btn-outline btn-sm flex-1"
+                  >
+                    <span>Next: {nextStage.label}</span>
+                    <ArrowRight size={12} />
+                  </button>
+                )}
+                <button onClick={() => onViewDossier(shipment)} className="btn btn-primary btn-sm flex-1">
+                  <FileText size={13} />
+                  <span>Dossier</span>
+                </button>
+                <button onClick={() => onEditShipment(shipment)} className="btn btn-outline btn-sm btn-icon-only" title="Edit shipment">
+                  <Edit3 size={15} />
+                </button>
+                <button onClick={() => onDeleteShipment(shipment.id)} className="btn btn-danger btn-sm btn-icon-only" title="Delete shipment">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </article>
+          );
+        })
+      )}
+    </div>
+    </>
   );
 };

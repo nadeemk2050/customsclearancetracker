@@ -137,7 +137,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div style={{
+    <div className="login-page" style={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
@@ -146,7 +146,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
       padding: '1.5rem',
       fontFamily: 'var(--font-sans)'
     }}>
-      <div style={{
+      <div className="login-shell" style={{
         maxWidth: '1050px',
         width: '100%',
         background: '#ffffff',
@@ -194,7 +194,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
               The end-to-end Customs Clearing Agency management system designed to eliminate port terminal storage charges and container line detention.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div className="login-features" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <ShieldCheck size={18} color="#38bdf8" />
                 <span style={{ fontSize: '0.8rem', color: '#f1f5f9', fontWeight: 600 }}>
