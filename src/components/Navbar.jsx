@@ -12,14 +12,13 @@ import {
   Building2,
   Users,
   LogOut,
-  CloudCheck,
-  CloudUpload,
-  CheckCircle,
   HardDrive,
   RefreshCw,
-  UserCheck,
   Terminal,
-  Table
+  Table,
+  Lock,
+  KeyRound,
+  X
 } from 'lucide-react';
 import { requestMaintenanceAccess } from '../utils/securityGate';
 import {
@@ -47,7 +46,33 @@ export const Navbar = ({
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showWorkLaterModal, setShowWorkLaterModal] = useState(false);
+  const [workLaterPassword, setWorkLaterPassword] = useState('');
+  const [workLaterError, setWorkLaterError] = useState('');
   const menuRef = useRef(null);
+
+  const handleWorkLaterClick = () => {
+    setIsMenuOpen(false);
+    const isUnlocked = sessionStorage.getItem('cct_work_later_unlocked') === 'true';
+    if (isUnlocked) {
+      setCurrentView('work-later');
+      return;
+    }
+    setWorkLaterPassword('');
+    setWorkLaterError('');
+    setShowWorkLaterModal(true);
+  };
+
+  const handleWorkLaterSubmit = (e) => {
+    if (e) e.preventDefault();
+    if (workLaterPassword === 'abcd') {
+      sessionStorage.setItem('cct_work_later_unlocked', 'true');
+      setShowWorkLaterModal(false);
+      setCurrentView('work-later');
+    } else {
+      setWorkLaterError('Incorrect password. Enter "abcd" to unlock.');
+    }
+  };
 
   // Close menu on click outside
   useEffect(() => {
@@ -109,24 +134,6 @@ export const Navbar = ({
                   Workspace Views
                 </div>
 
-                <button
-                  id="btn-menu-dashboard"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    setCurrentView('dashboard');
-                  }}
-                  className={`menu-item-action ${currentView === 'dashboard' ? 'menu-item-highlight' : ''}`}
-                  style={currentView === 'dashboard' ? { background: 'linear-gradient(to right, rgba(56, 189, 248, 0.15), transparent)' } : {}}
-                >
-                  <div className="menu-icon-square" style={{ background: currentView === 'dashboard' ? '#0284c7' : '#1e293b', color: '#ffffff' }}>
-                    <Layers size={17} />
-                  </div>
-                  <div>
-                    <div className="menu-item-title" style={{ color: currentView === 'dashboard' ? '#38bdf8' : '#f8fafc' }}>Operations Tracking</div>
-                    <div className="menu-item-sub">Active BL shipments & dossiers</div>
-                  </div>
-                </button>
-
                 {/* All BL Consignments Master Directory */}
                 <button
                   id="btn-menu-all-bl-master"
@@ -143,50 +150,6 @@ export const Navbar = ({
                   <div>
                     <div className="menu-item-title" style={{ color: currentView === 'bl-master' ? '#fbbf24' : '#f8fafc' }}>All BL Consignments Directory</div>
                     <div className="menu-item-sub">All active & cleared BL records in 1 list</div>
-                  </div>
-                </button>
-
-                <button
-                  id="btn-menu-loss-radar"
-                  onClick={() => {
-                    if (!handleLockedView('radar')) return;
-                    setIsMenuOpen(false);
-                    setCurrentView('radar');
-                  }}
-                  className={`menu-item-action ${currentView === 'radar' ? 'menu-item-highlight' : ''}`}
-                  style={currentView === 'radar' ? { background: 'linear-gradient(to right, rgba(239, 68, 68, 0.15), transparent)' } : {}}
-                >
-                  <div className="menu-icon-square" style={{ background: currentView === 'radar' ? '#ef4444' : '#1e293b', color: '#ffffff' }}>
-                    <ShieldAlert size={17} />
-                  </div>
-                  <div>
-                    <div className="menu-item-title" style={{ color: currentView === 'radar' ? '#f87171' : '#f8fafc' }}>
-                      Loss Prevention Radar
-                      {isViewLocked('radar') && <span className="menu-lock-badge">Maintenance</span>}
-                    </div>
-                    <div className="menu-item-sub">Demurrage & detention cutoffs</div>
-                  </div>
-                </button>
-
-                <button
-                  id="btn-menu-customer-portal"
-                  onClick={() => {
-                    if (!handleLockedView('portal')) return;
-                    setIsMenuOpen(false);
-                    setCurrentView('portal');
-                  }}
-                  className={`menu-item-action ${currentView === 'portal' ? 'menu-item-highlight' : ''}`}
-                  style={currentView === 'portal' ? { background: 'linear-gradient(to right, rgba(14, 165, 233, 0.15), transparent)' } : {}}
-                >
-                  <div className="menu-icon-square" style={{ background: currentView === 'portal' ? '#0284c7' : '#1e293b', color: '#ffffff' }}>
-                    <Search size={17} />
-                  </div>
-                  <div>
-                    <div className="menu-item-title" style={{ color: currentView === 'portal' ? '#38bdf8' : '#f8fafc' }}>
-                      Public Tracking Portal
-                      {isViewLocked('portal') && <span className="menu-lock-badge">Maintenance</span>}
-                    </div>
-                    <div className="menu-item-sub">Client self-service tracking</div>
                   </div>
                 </button>
 
@@ -251,6 +214,33 @@ export const Navbar = ({
                   <div>
                     <div className="menu-item-title">Manage Masters</div>
                     <div className="menu-item-sub">Shipping lines, Consignees, Ports, Cargo</div>
+                  </div>
+                </button>
+
+                <div className="menu-divider"></div>
+
+                {/* Work Later Sections (Encrypted with Password "abcd") */}
+                <button
+                  id="btn-menu-work-later"
+                  onClick={handleWorkLaterClick}
+                  className={`menu-item-action ${currentView === 'work-later' ? 'menu-item-highlight' : ''}`}
+                  style={{
+                    background: currentView === 'work-later'
+                      ? 'linear-gradient(to right, rgba(99, 102, 241, 0.22), transparent)'
+                      : 'linear-gradient(to right, rgba(99, 102, 241, 0.1), transparent)'
+                  }}
+                >
+                  <div className="menu-icon-square" style={{ background: '#4f46e5', color: '#ffffff' }}>
+                    <Lock size={17} />
+                  </div>
+                  <div>
+                    <div className="menu-item-title" style={{ color: '#a5b4fc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Work Later Sections</span>
+                      <span style={{ fontSize: '0.6rem', background: '#312e81', color: '#c7d2fe', padding: '1px 5px', borderRadius: '4px', border: '1px solid #4338ca', fontWeight: 800 }}>
+                        PASSWORD
+                      </span>
+                    </div>
+                    <div className="menu-item-sub">Operations, Radar & Public Portal</div>
                   </div>
                 </button>
 
@@ -324,15 +314,23 @@ export const Navbar = ({
 
         {/* Navigation Tabs & Right Header Actions */}
         <div className="nav-actions">
-          {/* Main Views Switcher */}
-          <button
-            id="tab-ops-dashboard"
-            onClick={() => setCurrentView('dashboard')}
-            className={`nav-tab-btn ${currentView === 'dashboard' ? 'active' : ''}`}
-          >
-            <Layers size={16} />
-            <span>Operations Tracking</span>
-          </button>
+          {/* View Indicator (Operations Tracking is now locked inside Work Later Sections) */}
+          {currentView === 'work-later' && (
+            <button
+              id="tab-work-later-active"
+              onClick={() => setCurrentView('bl-master')}
+              className="nav-tab-btn active"
+              style={{
+                background: 'rgba(99, 102, 241, 0.2)',
+                border: '1px solid rgba(99, 102, 241, 0.45)',
+                color: '#c7d2fe'
+              }}
+              title="Work Later Sections active. Click to return to ABC Tracking Directory."
+            >
+              <Lock size={14} />
+              <span>Work Later (Active)</span>
+            </button>
+          )}
 
 
 
@@ -464,6 +462,139 @@ export const Navbar = ({
           </button>
         </div>
       </div>
+
+      {/* Password Modal for Work Later Sections (Password: "abcd") */}
+      {showWorkLaterModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={() => setShowWorkLaterModal(false)}
+        >
+          <div 
+            style={{
+              background: '#0b1329',
+              border: '1px solid #312e81',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '380px',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)',
+              color: '#ffffff'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Lock size={18} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800 }}>Work Later Sections</h3>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Encrypted Workspace Protection</span>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowWorkLaterModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+              This section contains <strong>Operations Tracking</strong>, <strong>Loss Prevention Radar</strong>, and <strong>Public Portal</strong>. Enter authorization password to proceed:
+            </p>
+
+            <form onSubmit={handleWorkLaterSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ position: 'relative' }}>
+                  <KeyRound size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#6366f1' }} />
+                  <input
+                    type="password"
+                    autoFocus
+                    value={workLaterPassword}
+                    onChange={(e) => {
+                      setWorkLaterPassword(e.target.value);
+                      setWorkLaterError('');
+                    }}
+                    placeholder="Enter password..."
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 38px',
+                      background: '#070c18',
+                      border: workLaterError ? '1px solid #ef4444' : '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#ffffff',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
+                {workLaterError && (
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: '#f87171', fontWeight: 600 }}>
+                    {workLaterError}
+                  </p>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowWorkLaterModal(false)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    background: '#15203b',
+                    border: '1px solid #334155',
+                    color: '#cbd5e1',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 10px rgba(99, 102, 241, 0.4)'
+                  }}
+                >
+                  Unlock & Open
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

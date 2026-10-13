@@ -14,6 +14,8 @@ import { StatusUpdateModal } from './components/StatusUpdateModal';
 import { LossPreventionRadarView } from './components/LossPreventionRadarView';
 import { AllBlMasterView } from './components/AllBlMasterView';
 import { ManageMastersModal } from './components/ManageMastersModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { WorkLaterView } from './components/WorkLaterView';
 import { 
   subscribeToShipments, 
   persistShipment, 
@@ -394,17 +396,13 @@ export function App() {
       />
 
       {/* 2. Main Views */}
-      <main className={currentView === 'bl-master' ? 'flex-1 min-h-0 flex flex-col' : 'flex-1 pb-16'}>
-        {currentView === 'dashboard' && (
-          <div className="app-container">
-            {/* KPI Cards */}
-            <KpiMetrics
+      <main className={(currentView === 'bl-master' || currentView === 'work-later') ? 'flex-1 min-h-0 flex flex-col' : 'flex-1 pb-16'}>
+        {currentView === 'work-later' && (
+          <ErrorBoundary>
+            <WorkLaterView
+              shipments={shipments}
+              filteredShipments={filteredShipments}
               fleetMetrics={fleetMetrics}
-              onPresetFilter={(preset) => setActivePreset(preset)}
-            />
-
-            {/* Filter & Universal Search Toolbar */}
-            <FilterToolbar
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               selectedLine={selectedLine}
@@ -417,27 +415,53 @@ export function App() {
               setActivePreset={setActivePreset}
               shippingLines={shippingLines}
               onResetFilters={handleResetFilters}
-              shipments={shipments}
-            />
-
-            {/* High-Density Shipment Master-Detail Table */}
-            <ShipmentTable
-              shipments={filteredShipments}
               onViewDossier={handleViewDossier}
               onEditShipment={handleEditShipment}
               onDeleteShipment={handleDeleteShipment}
               onQuickUpdateStatus={handleQuickUpdateStatus}
               onQuickContainerReturn={handleQuickContainerReturn}
+              onBackToAbcTracker={() => setCurrentView('bl-master')}
             />
-          </div>
+          </ErrorBoundary>
         )}
 
         {currentView === 'bl-master' && (
-          <AllBlMasterView
-            shipments={shipments}
-            onViewDossier={handleViewDossier}
-            onEditShipment={handleEditShipment}
-          />
+          <ErrorBoundary>
+            <AllBlMasterView
+              shipments={shipments}
+              onViewDossier={handleViewDossier}
+              onEditShipment={handleEditShipment}
+            />
+          </ErrorBoundary>
+        )}
+
+        {/* Fallbacks for any direct view navigation */}
+        {currentView === 'dashboard' && (
+          <ErrorBoundary>
+            <WorkLaterView
+              shipments={shipments}
+              filteredShipments={filteredShipments}
+              fleetMetrics={fleetMetrics}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              selectedLine={selectedLine}
+              setSelectedLine={setSelectedLine}
+              selectedStatus={selectedStatus}
+              setSelectedStatus={setSelectedStatus}
+              selectedRisk={selectedRisk}
+              setSelectedRisk={setSelectedRisk}
+              activePreset={activePreset}
+              setActivePreset={setActivePreset}
+              shippingLines={shippingLines}
+              onResetFilters={handleResetFilters}
+              onViewDossier={handleViewDossier}
+              onEditShipment={handleEditShipment}
+              onDeleteShipment={handleDeleteShipment}
+              onQuickUpdateStatus={handleQuickUpdateStatus}
+              onQuickContainerReturn={handleQuickContainerReturn}
+              onBackToAbcTracker={() => setCurrentView('bl-master')}
+            />
+          </ErrorBoundary>
         )}
 
         {currentView === 'radar' && (
