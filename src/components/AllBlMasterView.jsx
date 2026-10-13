@@ -1,13 +1,12 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Briefcase } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Briefcase } from 'lucide-react';
 
 export const AllBlMasterView = ({ 
   shipments = [], 
+  searchQuery = '',
   onViewDossier, 
   onEditShipment 
 }) => {
-  const [search, setSearch] = useState('');
-
   const handleRowClick = (e, s) => {
     // If user is selecting text, avoid accidental drawer opening
     const selection = window.getSelection();
@@ -22,57 +21,33 @@ export const AllBlMasterView = ({
   };
 
   // Filter across all fields
-  const filteredShipments = shipments.filter(s => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    const cct = String(s.cctRefNo || s.id || '').toLowerCase();
-    const bl = String(s.blNo || '').toLowerCase();
-    const dealer = String(s.dealerName || '').toLowerCase();
-    const lot = String(s.lotNo || '').toLowerCase();
-    const vessel = String(s.vessel || '').toLowerCase();
-    const cust = String(s.consignee || '').toLowerCase();
-    const pol = String(s.pol || '').toLowerCase();
-    const pod = String(s.pod || '').toLowerCase();
-    const status = String(s.customsStatus || '').toLowerCase();
-    const containers = (s.containers || []).map(c => String(c.containerNumber || c.containerNo || '')).join(' ').toLowerCase();
+  const filteredShipments = useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (!q) return shipments;
+    return shipments.filter(s => {
+      const cct = String(s.cctRefNo || s.id || '').toLowerCase();
+      const bl = String(s.blNo || '').toLowerCase();
+      const dealer = String(s.dealerName || '').toLowerCase();
+      const lot = String(s.lotNo || '').toLowerCase();
+      const vessel = String(s.vessel || '').toLowerCase();
+      const cust = String(s.consignee || '').toLowerCase();
+      const pol = String(s.pol || '').toLowerCase();
+      const pod = String(s.pod || '').toLowerCase();
+      const status = String(s.customsStatus || '').toLowerCase();
+      const containers = (s.containers || []).map(c => String(c.containerNumber || c.containerNo || '')).join(' ').toLowerCase();
 
-    return cct.includes(q) ||
-           bl.includes(q) || 
-           dealer.includes(q) ||
-           lot.includes(q) ||
-           vessel.includes(q) || 
-           cust.includes(q) || 
-           pol.includes(q) || 
-           pod.includes(q) || 
-           status.includes(q) || 
-           containers.includes(q);
-  });
-
-  // Aggregate counters for the top bar (record, container and weight sums)
-  const totals = useMemo(() => {
-    const toNumber = (value) => {
-      const parsed = parseFloat(String(value ?? '').replace(/[^0-9.]/g, ''));
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
-
-    return filteredShipments.reduce((acc, s) => {
-      acc.containers += (s.containers || []).length;
-      acc.netWeight += toNumber(s.netWeight ?? s.grossWeightKg);
-      return acc;
-    }, { containers: 0, netWeight: 0 });
-  }, [filteredShipments]);
-
-  const counterStyle = {
-    display: 'inline-flex',
-    alignItems: 'baseline',
-    gap: '6px',
-    fontSize: '0.7rem',
-    fontWeight: 700,
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    whiteSpace: 'nowrap'
-  };
+      return cct.includes(q) ||
+             bl.includes(q) || 
+             dealer.includes(q) ||
+             lot.includes(q) ||
+             vessel.includes(q) || 
+             cust.includes(q) || 
+             pol.includes(q) || 
+             pod.includes(q) || 
+             status.includes(q) || 
+             containers.includes(q);
+    });
+  }, [shipments, searchQuery]);
 
   const thStyle = {
     position: 'sticky',
@@ -94,109 +69,6 @@ export const AllBlMasterView = ({
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {/* Page Title Bar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px',
-        padding: '14px 16px 12px',
-        borderBottom: '1px solid #1e293b',
-        background: '#0b1329',
-        flexShrink: 0
-      }}>
-        <h1 style={{
-          margin: 0,
-          fontSize: '1.15rem',
-          fontWeight: 800,
-          letterSpacing: '0.14em',
-          color: '#f8fafc',
-          textTransform: 'uppercase'
-        }}>
-          ABC TRACKING
-        </h1>
-
-        {/* Aggregate counters for the filtered set */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '22px', flexWrap: 'wrap' }}>
-          <span style={counterStyle}>
-            <strong style={{ color: '#f8fafc', fontSize: '0.95rem' }}>{filteredShipments.length}</strong> BLs
-          </span>
-          <span style={counterStyle}>
-            <strong style={{ color: '#38bdf8', fontSize: '0.95rem' }}>{totals.containers}</strong> Containers
-          </span>
-          <span style={counterStyle}>
-            <strong style={{ color: '#fbbf24', fontSize: '0.95rem' }}>{totals.netWeight.toLocaleString('en-US')}</strong> KG Net Weight
-          </span>
-        </div>
-      </div>
-
-      {/* Search Toolbar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px',
-        padding: '10px 16px',
-        borderBottom: '1px solid #1e293b',
-        background: '#070c18',
-        flexShrink: 0
-      }}>
-        <div style={{ position: 'relative', flex: '1 1 320px', maxWidth: '440px' }}>
-          <Search 
-            size={16} 
-            style={{ 
-              position: 'absolute', 
-              left: '14px', 
-              top: '50%', 
-              transform: 'translateY(-50%)', 
-              color: '#64748b' 
-            }} 
-          />
-          <input
-            type="text"
-            placeholder="Search bls across all clients..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              width: '100%',
-              background: '#0b1329',
-              border: '1px solid #1e293b',
-              borderRadius: '8px',
-              padding: '9px 14px 9px 40px',
-              color: '#ffffff',
-              fontSize: '0.85rem',
-              outline: 'none',
-              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)',
-              transition: 'border-color 150ms'
-            }}
-            onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
-            onBlur={(e) => e.target.style.borderColor = '#1e293b'}
-          />
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ 
-            color: '#64748b', 
-            fontSize: '0.72rem', 
-            fontWeight: 600,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            <span style={{ 
-              display: 'inline-block', 
-              width: '6px', 
-              height: '6px', 
-              borderRadius: '50%', 
-              background: '#38bdf8' 
-            }} />
-            Click any row to open BL details & documents
-          </span>
-        </div>
-      </div>
-
       {/* Table fills the remaining height and scrolls internally */}
       <div 
         style={{

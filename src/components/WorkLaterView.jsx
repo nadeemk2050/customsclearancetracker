@@ -4,7 +4,8 @@ import {
   Layers, 
   ShieldAlert, 
   Globe, 
-  ArrowLeft
+  ArrowLeft,
+  Terminal
 } from 'lucide-react';
 import { KpiMetrics } from './KpiMetrics';
 import { FilterToolbar } from './FilterToolbar';
@@ -33,9 +34,10 @@ export const WorkLaterView = ({
   onDeleteShipment,
   onQuickUpdateStatus,
   onQuickContainerReturn,
-  onBackToAbcTracker
+  onBackToAbcTracker,
+  onOpenDevModal
 }) => {
-  // Tabs: 'operations' | 'radar' | 'portal'
+  // Tabs: 'operations' | 'radar' | 'portal' | 'dev-powers'
   const [activeTab, setActiveTab] = useState('operations');
 
   const tabs = [
@@ -62,6 +64,14 @@ export const WorkLaterView = ({
       icon: Globe,
       color: '#10b981',
       desc: 'External client live BL self-service tracker'
+    },
+    {
+      id: 'dev-powers',
+      label: '4. Developer Powers',
+      shortLabel: 'Dev Powers',
+      icon: Terminal,
+      color: '#f59e0b',
+      desc: 'Super-admin multi-firm controls & system settings'
     }
   ];
 

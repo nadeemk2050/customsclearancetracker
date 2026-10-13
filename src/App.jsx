@@ -196,6 +196,52 @@ export function App() {
     });
   }, [shipments, searchQuery, selectedLine, selectedStatus, selectedRisk, activePreset]);
 
+  // Aggregate counters for the ABC Tracking directory (calculated across search filter)
+  const abcTotals = useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    const filtered = shipments.filter(s => {
+      if (!q) return true;
+      const cct = String(s.cctRefNo || s.id || '').toLowerCase();
+      const bl = String(s.blNo || '').toLowerCase();
+      const dealer = String(s.dealerName || '').toLowerCase();
+      const lot = String(s.lotNo || '').toLowerCase();
+      const vessel = String(s.vessel || '').toLowerCase();
+      const cust = String(s.consignee || '').toLowerCase();
+      const pol = String(s.pol || '').toLowerCase();
+      const pod = String(s.pod || '').toLowerCase();
+      const status = String(s.customsStatus || '').toLowerCase();
+      const containers = (s.containers || []).map(c => String(c.containerNumber || c.containerNo || '')).join(' ').toLowerCase();
+
+      return cct.includes(q) ||
+             bl.includes(q) || 
+             dealer.includes(q) ||
+             lot.includes(q) ||
+             vessel.includes(q) || 
+             cust.includes(q) || 
+             pol.includes(q) || 
+             pod.includes(q) || 
+             status.includes(q) || 
+             containers.includes(q);
+    });
+
+    const toNumber = (value) => {
+      const parsed = parseFloat(String(value ?? '').replace(/[^0-9.]/g, ''));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const aggregated = filtered.reduce((acc, s) => {
+      acc.containers += (s.containers || []).length;
+      acc.netWeight += toNumber(s.netWeight ?? s.grossWeightKg);
+      return acc;
+    }, { containers: 0, netWeight: 0 });
+
+    return {
+      count: filtered.length,
+      containers: aggregated.containers,
+      netWeight: aggregated.netWeight
+    };
+  }, [shipments, searchQuery]);
+
   // Auth Handlers
   const handleLoginSuccess = (newSession) => {
     setCurrentSession(newSession);
@@ -393,6 +439,9 @@ export function App() {
         currentSession={session}
         syncStatus={syncStatus}
         totalShipments={shipments.length}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        abcTotals={abcTotals}
       />
 
       {/* 2. Main Views */}
@@ -421,6 +470,7 @@ export function App() {
               onQuickUpdateStatus={handleQuickUpdateStatus}
               onQuickContainerReturn={handleQuickContainerReturn}
               onBackToAbcTracker={() => setCurrentView('bl-master')}
+              onOpenDevModal={() => setIsDevModalOpen(true)}
             />
           </ErrorBoundary>
         )}
@@ -429,6 +479,7 @@ export function App() {
           <ErrorBoundary>
             <AllBlMasterView
               shipments={shipments}
+              searchQuery={searchQuery}
               onViewDossier={handleViewDossier}
               onEditShipment={handleEditShipment}
             />

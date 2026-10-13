@@ -42,7 +42,10 @@ export const Navbar = ({
   onTriggerSync,
   currentSession,
   syncStatus = { pending: false },
-  totalShipments
+  totalShipments,
+  searchQuery = '',
+  setSearchQuery,
+  abcTotals = { count: 0, containers: 0, netWeight: 0 }
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -106,8 +109,9 @@ export const Navbar = ({
     return false;
   };
 
-  const companyName = currentSession?.companyName || 'AL MUMTAZ CUSTOMS CLEARING LLC';  const displayName = currentSession?.displayName || currentSession?.username || 'Administrator';
-  const role = currentSession?.role || 'CHA Administrator';
+  const companyName = currentSession?.companyName || 'AL MUMTAZ CUSTOMS CLEARING LLC';
+  const rawDisplayName = currentSession?.displayName || currentSession?.username || 'Administrator';
+  const displayName = rawDisplayName.replace(/\s*\([^)]*\)/g, '').trim();
 
   return (
     <nav className="navbar">
@@ -158,27 +162,6 @@ export const Navbar = ({
                 <div className="menu-header-label">
                   Administration & Configuration
                 </div>
-
-                {/* Developer Super-Admin Console */}
-                {currentSession?.isDeveloper && (
-                  <button
-                    id="btn-menu-dev-console"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      if (onOpenDevModal) onOpenDevModal();
-                    }}
-                    className="menu-item-action"
-                    style={{ background: 'linear-gradient(to right, rgba(245, 158, 11, 0.16), transparent)' }}
-                  >
-                    <div className="menu-icon-square" style={{ background: '#f59e0b', color: '#000000' }}>
-                      <Terminal size={17} />
-                    </div>
-                    <div>
-                      <div className="menu-item-title" style={{ color: '#fbbf24' }}>Developer Powers</div>
-                      <div className="menu-item-sub">Allow, revoke & delete firms globally</div>
-                    </div>
-                  </button>
-                )}
 
                 {/* 1. Assign Team Members */}
                 <button
@@ -274,46 +257,146 @@ export const Navbar = ({
             )}
           </div>
 
-          {/* Brand Icon */}
-          <div className="brand-icon-box">
-            <Ship size={24} strokeWidth={2.2} />
+          {/* Brand Icon (Compact Sizing) */}
+          <div className="brand-icon-box" style={{ width: '28px', height: '28px', minWidth: '28px', borderRadius: '6px' }}>
+            <Ship size={16} strokeWidth={2.2} />
           </div>
 
           {/* Brand Title & CHA Company Prominent Banner */}
-          <div className="brand-title-wrap">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <h1 style={{ margin: 0 }}>
-                CustomsTrack <span style={{ color: '#38bdf8' }}>PRO</span>
-              </h1>
+          <div className="brand-title-wrap" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+              CustomsTrack <span style={{ color: '#38bdf8' }}>PRO</span>
+            </span>
 
-              {/* Prominent Main CHA Company Badge */}
-              <div 
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(37, 99, 235, 0.35))',
-                  border: '1px solid rgba(56, 189, 248, 0.5)',
-                  padding: '3px 10px',
-                  borderRadius: '20px',
-                  color: '#ffffff',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  letterSpacing: '0.02em',
-                  boxShadow: '0 2px 8px rgba(14, 165, 233, 0.2)'
-                }}
-                className="nav-company-chip"
-                title={`Active Customs House Agent Account: ${companyName}`}
-              >
-                <Building2 size={13} color="#38bdf8" />
-                <span className="nav-company-name">{companyName}</span>
-              </div>
+            {/* Compact Main CHA Company Badge */}
+            <div 
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(37, 99, 235, 0.35))',
+                border: '1px solid rgba(56, 189, 248, 0.5)',
+                padding: '2px 7px',
+                borderRadius: '12px',
+                color: '#ffffff',
+                fontSize: '0.67rem',
+                fontWeight: 800,
+                letterSpacing: '0.02em',
+                whiteSpace: 'nowrap'
+              }}
+              className="nav-company-chip"
+              title={`Active Customs House Agent Account: ${companyName}`}
+            >
+              <Building2 size={11} color="#38bdf8" />
+              <span className="nav-company-name">{companyName}</span>
             </div>
+          </div>
+
+          {/* Divider & ABC TRACKING Title (Merged from 2nd bar) */}
+          <div style={{ width: '1px', height: '20px', background: 'rgba(255, 255, 255, 0.15)', margin: '0 4px', flexShrink: 0 }} />
+
+          <div 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '2px 8px',
+              background: 'rgba(56, 189, 248, 0.08)',
+              border: '1px solid rgba(56, 189, 248, 0.25)',
+              borderRadius: '6px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
+            }}
+            title="ABC Tracking Consolidated BL Master"
+          >
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 6px #38bdf8' }} />
+            <span style={{
+              fontSize: '0.8rem',
+              fontWeight: 800,
+              letterSpacing: '0.08em',
+              color: '#f8fafc',
+              textTransform: 'uppercase'
+            }}>
+              ABC TRACKING
+            </span>
           </div>
         </div>
 
-        {/* Navigation Tabs & Right Header Actions */}
-        <div className="nav-actions">
+        {/* Center Section: Search Bar (from 3rd bar) + Aggregate Metrics (from 2nd bar) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 auto', justifyContent: 'center', minWidth: 0, padding: '0 6px' }}>
+          {/* Merged Search Input (from 3rd bar) */}
+          <div style={{ position: 'relative', width: '100%', maxWidth: '280px', minWidth: '150px', flexShrink: 1 }}>
+            <Search 
+              size={13} 
+              style={{ 
+                position: 'absolute', 
+                left: '10px', 
+                top: '50%', 
+                transform: 'translateY(-50%)', 
+                color: '#64748b',
+                pointerEvents: 'none'
+              }} 
+            />
+            <input
+              type="text"
+              placeholder="Search bls across all clients..."
+              value={searchQuery || ''}
+              onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                height: '30px',
+                background: '#070f20',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                borderRadius: '6px',
+                padding: '3px 8px 3px 28px',
+                color: '#ffffff',
+                fontSize: '0.78rem',
+                outline: 'none',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)',
+                transition: 'border-color 150ms'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
+              onBlur={(e) => e.target.style.borderColor = 'rgba(56, 189, 248, 0.25)'}
+            />
+          </div>
+
+          {/* Merged Aggregate Counters (from 2nd bar) */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            background: 'rgba(7, 15, 32, 0.7)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '6px',
+            padding: '3px 10px',
+            whiteSpace: 'nowrap',
+            flexShrink: 0
+          }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+              <strong style={{ color: '#f8fafc', fontSize: '0.82rem', fontWeight: 800 }}>
+                {abcTotals?.count ?? 0}
+              </strong>
+              <span>BLs</span>
+            </span>
+            <span style={{ color: '#334155', fontSize: '0.7rem' }}>|</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+              <strong style={{ color: '#38bdf8', fontSize: '0.82rem', fontWeight: 800 }}>
+                {abcTotals?.containers ?? 0}
+              </strong>
+              <span>Containers</span>
+            </span>
+            <span style={{ color: '#334155', fontSize: '0.7rem' }}>|</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+              <strong style={{ color: '#fbbf24', fontSize: '0.82rem', fontWeight: 800 }}>
+                {(abcTotals?.netWeight ?? 0).toLocaleString('en-US')}
+              </strong>
+              <span>KG Net Weight</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Right Section: Sync Status, User Profile (Role removed!), CTA Button */}
+        <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           {/* View Indicator (Operations Tracking is now locked inside Work Later Sections) */}
           {currentView === 'work-later' && (
             <button
@@ -323,18 +406,18 @@ export const Navbar = ({
               style={{
                 background: 'rgba(99, 102, 241, 0.2)',
                 border: '1px solid rgba(99, 102, 241, 0.45)',
-                color: '#c7d2fe'
+                color: '#c7d2fe',
+                padding: '4px 10px',
+                fontSize: '0.74rem',
+                height: '30px',
+                borderRadius: '6px'
               }}
               title="Work Later Sections active. Click to return to ABC Tracking Directory."
             >
-              <Lock size={14} />
-              <span>Work Later (Active)</span>
+              <Lock size={12} />
+              <span>Back to ABC</span>
             </button>
           )}
-
-
-
-
 
           {/* Offline-First Bidirectional Sync Status Chip */}
           <div 
@@ -343,8 +426,9 @@ export const Navbar = ({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '4px 10px',
+              gap: '4px',
+              padding: '3px 8px',
+              height: '28px',
               background: syncStatus.status === 'error' ? 'rgba(239, 68, 68, 0.15)' 
                 : (syncStatus.status === 'syncing' || isSyncing) ? 'rgba(56, 189, 248, 0.15)'
                 : syncStatus.status === 'offline' ? 'rgba(245, 158, 11, 0.15)' 
@@ -353,110 +437,84 @@ export const Navbar = ({
                 : (syncStatus.status === 'syncing' || isSyncing) ? '1px solid rgba(56, 189, 248, 0.35)'
                 : syncStatus.status === 'offline' ? '1px solid rgba(245, 158, 11, 0.35)' 
                 : '1px solid rgba(16, 185, 129, 0.35)',
-              borderRadius: '20px',
-              fontSize: '0.7rem',
+              borderRadius: '14px',
+              fontSize: '0.67rem',
               fontWeight: 700,
               color: syncStatus.status === 'error' ? '#f87171' 
                 : (syncStatus.status === 'syncing' || isSyncing) ? '#38bdf8' 
                 : syncStatus.status === 'offline' ? '#fbbf24' 
                 : '#34d399',
               cursor: 'pointer',
-              userSelect: 'none'
+              userSelect: 'none',
+              whiteSpace: 'nowrap'
             }}
-            title={`Status: ${syncStatus.status || 'connected'} | Outbox Queue: ${syncStatus.metrics?.queueDepth || 0} | Pushed: ${syncStatus.metrics?.rowsPushed || 0} | Pulled: ${syncStatus.metrics?.rowsPulled || 0}. Click to trigger sync.`}
+            title={`Status: ${syncStatus.status || 'connected'}. Click to trigger sync.`}
           >
-            <HardDrive size={12} color="#38bdf8" />
+            <HardDrive size={11} color="#38bdf8" />
             {(isSyncing || syncStatus.status === 'syncing') ? (
-              <span className="nav-sync-text" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <RefreshCw size={11} className="animate-spin" /> Syncing...
+              <span className="nav-sync-text" style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <RefreshCw size={10} className="animate-spin" /> Syncing...
               </span>
             ) : syncStatus.status === 'offline' ? (
-              <span className="nav-sync-text">Offline (Local-First Active)</span>
+              <span className="nav-sync-text">Offline</span>
             ) : (syncStatus.metrics?.queueDepth > 0) ? (
-              <span className="nav-sync-text">{syncStatus.metrics.queueDepth} Queued (Syncing...)</span>
+              <span className="nav-sync-text">{syncStatus.metrics.queueDepth} Queued</span>
             ) : (
-              <span className="nav-sync-text">🟢 Live Synced (Local-First)</span>
+              <span className="nav-sync-text">🟢 Live Synced</span>
             )}
           </div>
 
-          {/* Logged In User Profile Chip & Logout */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            paddingLeft: '8px',
-            borderLeft: '1px solid rgba(255, 255, 255, 0.12)'
-          }}>
-            {/* Developer Console Button */}
-            {currentSession?.isDeveloper && (
-              <button
-                id="btn-nav-dev-console"
-                onClick={onOpenDevModal}
-                className="btn btn-sm"
-                style={{
-                  background: 'linear-gradient(135deg, #f59e0b, #ef4444)',
-                  color: '#ffffff',
-                  fontWeight: 800,
-                  fontSize: '0.75rem',
-                  border: 'none',
-                  boxShadow: '0 2px 12px rgba(245, 158, 11, 0.4)',
-                  padding: '5px 10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderRadius: '8px'
-                }}
-                title="Developer Super-Admin Console"
-              >
-                <Terminal size={14} />
-                <span>Dev Powers</span>
-              </button>
-            )}
-
-            {/* Active User Info & Sign Out */}
-            <div 
-              className="nav-user-chip"
-              style={{
+          {/* Logged In User Profile Chip (ROLE REMOVED as requested) */}
+          <div 
+            className="nav-user-chip"
+            style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: '6px',
               background: 'rgba(255, 255, 255, 0.08)',
-              padding: '4px 10px 4px 6px',
-              borderRadius: '20px',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
+              padding: '2px 8px 2px 4px',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              height: '28px',
+              whiteSpace: 'nowrap'
+            }}
+            title={`Logged in user: ${displayName}`}
+          >
+            <div style={{
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              background: currentSession?.isDeveloper ? '#ef4444' : currentSession?.userType === 'admin' ? '#f59e0b' : '#0284c7',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '0.7rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                background: currentSession?.isDeveloper ? '#ef4444' : currentSession?.userType === 'admin' ? '#f59e0b' : '#0284c7',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.75rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                {currentSession?.isDeveloper ? '⚡' : displayName.charAt(0).toUpperCase()}
-              </div>
-              <div className="nav-user-text" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f8fafc' }}>
-                  {displayName}
-                </span>
-                <span style={{ fontSize: '0.625rem', color: currentSession?.isDeveloper ? '#fbbf24' : '#94a3b8' }}>
-                  {role}
-                </span>
-              </div>
+              {currentSession?.isDeveloper ? '⚡' : displayName.charAt(0).toUpperCase()}
             </div>
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#f8fafc' }}>
+              {displayName}
+            </span>
           </div>
 
           {/* New Shipment BL CTA Button */}
           <button
             id="btn-add-shipment"
             onClick={onOpenNewModal}
-            className="btn btn-primary btn-sm ml-1 nav-cta"
+            className="btn btn-primary btn-sm nav-cta"
+            style={{
+              height: '30px',
+              fontSize: '0.76rem',
+              padding: '0 10px',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
           >
-            <PlusCircle size={16} />
+            <PlusCircle size={14} />
             <span className="nav-cta-full">New Shipment BL</span>
             <span className="nav-cta-short">New BL</span>
           </button>

@@ -140,38 +140,44 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 72px;
-  padding: 0 1.5rem;
-  max-width: 1600px;
+  min-height: 50px;
+  height: 52px;
+  padding: 0 1rem;
+  max-width: 100%;
   margin: 0 auto;
+  gap: 10px;
 }
 
 .brand-section {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .brand-icon-box {
-  width: 44px;
-  height: 44px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
   background: linear-gradient(135deg, #2563eb, #06b6d4);
-  border-radius: var(--radius-md);
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+  flex-shrink: 0;
 }
 
 .brand-title-wrap h1 {
-  font-size: 1.25rem;
+  font-size: 0.92rem;
   color: #ffffff;
   font-weight: 800;
   letter-spacing: -0.01em;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .brand-badge {
@@ -1486,9 +1492,9 @@
    Ultra-Premium Dropdown Menu & Hamburger Navigation
 =================================================== */
 .hamburger-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.16);
   color: #ffffff;
@@ -1497,7 +1503,7 @@
   justify-content: center;
   cursor: pointer;
   transition: all 180ms ease;
-  margin-right: 8px;
+  margin-right: 4px;
   flex-shrink: 0;
 }
 
