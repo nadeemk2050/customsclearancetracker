@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   X, 
   Download,
@@ -18,12 +18,15 @@ import {
   Paperclip,
   FileText,
   Eye,
-  Truck
+  Truck,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { formatDate, formatDateTime, formatCurrency } from '../utils/dateUtils';
 import { calculateDetentionMetrics } from '../utils/detentionEngine';
-import { BL_ATTACHMENT_SLOTS, formatFileSize } from '../services/attachmentService';
+import { BL_ATTACHMENT_SLOTS, formatFileSize, uploadBlAttachment, deleteBlAttachment } from '../services/attachmentService';
 import { downloadDossierPdf } from '../utils/dossierPdf';
+import { requestActionPassword } from '../utils/securityGate';
 
 const STAGES = [
   { id: 'Pre-Arrival', label: 'Pre-Arrival' },
@@ -43,16 +46,103 @@ export const DossierDrawer = ({
   onClose, 
   onEdit, 
   onUpdateStatus,
-  companyName = 'CustomsTrack PRO'
+  companyName = 'CustomsTrack PRO',
+  companyId,
+  currentUser,
+  onUpdateShipment
 }) => {
   const [pdfState, setPdfState] = useState('idle'); // idle | working | error
   const [pdfError, setPdfError] = useState('');
+  const [uploadStatus, setUploadStatus] = useState({}); // { [slotKey]: 'idle' | 'compressing' | 'uploading' }
+  const [uploadError, setUploadError] = useState({});
+  const fileInputRefs = useRef({});
 
   if (!isOpen || !shipment) return null;
 
   const metrics = calculateDetentionMetrics(shipment);
   const currentStageIndex = STAGES.findIndex(s => s.id === shipment.customsStatus);
   const progressPercent = Math.max(0, Math.min(100, (currentStageIndex / (STAGES.length - 1)) * 100));
+
+  const handleSlotPick = async (slotKey, event) => {
+    const file = event?.target?.files?.[0];
+    if (event?.target) event.target.value = '';
+    if (!file) return;
+
+    const previousDoc = (shipment.blDocuments || {})[slotKey];
+    if (previousDoc?.path && !requestActionPassword(`replace the stored ${slotKey === 'blDraft' ? 'BL Draft' : 'Original BL'}`)) {
+      return;
+    }
+
+    setUploadError(prev => ({ ...prev, [slotKey]: '' }));
+    setUploadStatus(prev => ({ ...prev, [slotKey]: 'compressing' }));
+
+    try {
+      const meta = await uploadBlAttachment({
+        file,
+        companyId,
+        shipmentId: shipment.id,
+        slot: slotKey,
+        user: currentUser,
+        onProgress: (info) => {
+          if (info?.phase === 'compressing') {
+            setUploadStatus(prev => ({ ...prev, [slotKey]: 'compressing' }));
+          }
+        }
+      });
+
+      setUploadStatus(prev => ({ ...prev, [slotKey]: 'uploading' }));
+
+      // Clean up previous remote file if replacing
+      if (previousDoc?.path) {
+        await deleteBlAttachment(previousDoc.path);
+      }
+
+      const updatedBlDocs = {
+        ...(shipment.blDocuments || {}),
+        [slotKey]: meta
+      };
+
+      if (onUpdateShipment) {
+        await onUpdateShipment(shipment.id, updatedBlDocs);
+      }
+    } catch (err) {
+      setUploadError(prev => ({
+        ...prev,
+        [slotKey]: err?.message || 'Upload failed. Please try again.'
+      }));
+    } finally {
+      setUploadStatus(prev => ({ ...prev, [slotKey]: 'idle' }));
+    }
+  };
+
+  const handleSlotRemove = async (slotKey) => {
+    const label = slotKey === 'blDraft' ? 'BL Draft' : 'Original BL';
+    if (!requestActionPassword(`remove the stored ${label}`)) return;
+
+    const previousDoc = (shipment.blDocuments || {})[slotKey];
+    const path = previousDoc?.path;
+
+    const updatedBlDocs = {
+      ...(shipment.blDocuments || {})
+    };
+    delete updatedBlDocs[slotKey];
+
+    if (onUpdateShipment) {
+      await onUpdateShipment(shipment.id, updatedBlDocs);
+    }
+    if (path) {
+      await deleteBlAttachment(path);
+    }
+  };
+
+  const handleSlotDrop = (slotKey, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer?.files?.[0];
+    if (file) {
+      handleSlotPick(slotKey, { target: { files: [file], value: '' } });
+    }
+  };
 
   const handleDownloadPdf = async () => {
     setPdfError('');
@@ -194,58 +284,139 @@ export const DossierDrawer = ({
               {BL_ATTACHMENT_SLOTS.map(({ key, label }) => {
                 const doc = (shipment.blDocuments || {})[key];
                 const isImage = (doc?.type || '').startsWith('image/') || doc?.kind === 'image';
+                const slotState = uploadStatus[key] || 'idle';
+                const isBusy = slotState !== 'idle';
+                const errorMsg = uploadError[key];
 
                 return (
                   <div
                     key={key}
-                    className={`p-3 rounded-lg border ${doc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleSlotDrop(key, e)}
+                    className={`p-3.5 rounded-xl border transition-all ${
+                      doc ? 'bg-emerald-50/70 border-emerald-300' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                    }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <strong className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</strong>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          doc ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
-                        }`}
-                      >
-                        {doc ? 'RECEIVED' : 'PENDING'}
-                      </span>
+                    <input
+                      ref={el => fileInputRefs.current[key] = el}
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => handleSlotPick(key, e)}
+                      style={{ display: 'none' }}
+                    />
+
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <strong className="text-[11px] font-bold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
+                        <Paperclip size={13} className={doc ? 'text-emerald-600' : 'text-slate-400'} />
+                        {label}
+                      </strong>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            doc ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {doc ? 'RECEIVED' : 'PENDING'}
+                        </span>
+                        {!doc && !isBusy && (
+                          <button
+                            type="button"
+                            onClick={() => fileInputRefs.current[key]?.click()}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md transition-colors"
+                          >
+                            <Upload size={11} /> Upload
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {doc ? (
-                      <div className="flex items-center gap-3 mt-2">
+                    {isBusy && (
+                      <div className="flex items-center gap-2 p-2.5 my-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
+                        <Loader2 size={14} className="animate-spin text-blue-600 shrink-0" />
+                        <span>{slotState === 'compressing' ? 'Compressing to ≤ 150 KB…' : 'Uploading to Cloud Storage…'}</span>
+                      </div>
+                    )}
+
+                    {errorMsg && (
+                      <div className="flex items-center gap-1.5 p-2 my-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                        <AlertTriangle size={13} className="shrink-0" />
+                        <span>{errorMsg}</span>
+                      </div>
+                    )}
+
+                    {doc && !isBusy ? (
+                      <div className="flex items-center gap-3 mt-1.5">
                         {isImage ? (
-                          <a href={doc.url} target="_blank" rel="noreferrer" title="Open full size">
+                          <a href={doc.url} target="_blank" rel="noreferrer" title="Open full size image">
                             <img
                               src={doc.url}
                               alt={`${label} preview`}
-                              className="w-14 h-14 object-cover rounded border border-emerald-200 bg-white"
+                              className="w-14 h-14 object-cover rounded-lg border border-emerald-300 bg-white hover:opacity-90 shadow-xs"
                             />
                           </a>
                         ) : (
-                          <span className="w-14 h-14 rounded border border-emerald-200 bg-white flex items-center justify-center shrink-0">
-                            <FileText size={22} className="text-emerald-700" />
-                          </span>
+                          <a href={doc.url} target="_blank" rel="noreferrer" title="Open PDF document" className="w-14 h-14 rounded-lg border border-emerald-300 bg-white flex items-center justify-center shrink-0 hover:bg-emerald-100 transition-colors">
+                            <FileText size={24} className="text-emerald-700" />
+                          </a>
                         )}
 
                         <div className="min-w-0 flex-1">
-                          <div className="text-[11px] font-bold text-emerald-900 break-words">{doc.name}</div>
+                          <div className="text-[11px] font-bold text-emerald-950 truncate" title={doc.name}>
+                            {doc.name}
+                          </div>
                           <div className="text-[10px] text-emerald-700">
                             {formatFileSize(doc.size)}
-                            {doc.originalSize > doc.size ? ` (from ${formatFileSize(doc.originalSize)})` : ''}
+                            {doc.originalSize > doc.size ? ` (compressed from ${formatFileSize(doc.originalSize)})` : ''}
                             {doc.pages ? ` · ${doc.pages} page(s)` : ''}
                           </div>
                           <div className="text-[10px] text-slate-500">
                             {doc.uploadedBy} · {formatDateTime(doc.uploadedAt)}
                           </div>
-                        </div>
 
-                        <a className="bl-attach-link no-print" href={doc.url} target="_blank" rel="noreferrer">
-                          <Eye size={12} /> View
-                        </a>
+                          <div className="flex items-center gap-2 mt-2 no-print">
+                            <a
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100 hover:bg-emerald-200 px-2 py-0.5 rounded border border-emerald-300 transition-colors"
+                              href={doc.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <Eye size={11} /> View
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => fileInputRefs.current[key]?.click()}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded border border-slate-300 transition-colors"
+                              title={`Replace ${label}`}
+                            >
+                              <Upload size={11} /> Replace
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSlotRemove(key)}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded border border-rose-200 transition-colors"
+                              title={`Remove ${label}`}
+                            >
+                              <Trash2 size={11} /> Delete
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-[11px] text-slate-500 mt-2">Not uploaded yet.</p>
-                    )}
+                    ) : !isBusy ? (
+                      <div className="mt-1">
+                        <div 
+                          onClick={() => fileInputRefs.current[key]?.click()}
+                          className="border-2 border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 rounded-lg p-3 text-center cursor-pointer transition-all group"
+                        >
+                          <div className="flex items-center justify-center gap-1.5 text-blue-600 group-hover:text-blue-700 font-bold text-xs mb-0.5">
+                            <Upload size={14} />
+                            <span>Click to Upload {label}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 m-0">
+                            Select or drag PDF / Image (auto-compressed to ≤ 150 KB)
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
@@ -536,29 +707,6 @@ export const DossierDrawer = ({
             </div>
           )}
         </div>
-
-      {/* Footer */}
-      <footer className="bl-form-footer">
-        <span className="bl-hint" style={{ marginTop: 0 }}>
-          Live dossier - use Download PDF to share or archive it.
-        </span>
-        <div className="bl-form-actions">
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              if (onEdit) onEdit(shipment);
-            }}
-            className="btn btn-primary"
-          >
-            <Edit3 size={15} />
-            <span>Edit Consignment Details</span>
-          </button>
-          <button onClick={onClose} className="btn btn-outline">
-            Close Dossier
-          </button>
-        </div>
-      </footer>
     </div>
   );
 };

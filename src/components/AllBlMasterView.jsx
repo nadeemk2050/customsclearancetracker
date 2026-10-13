@@ -115,7 +115,7 @@ export const AllBlMasterView = ({
             {filteredShipments.length === 0 ? (
               <tr>
                 <td colSpan="13" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
-                  No BL consignments found matching "{search}".
+                  No BL consignments found matching "{searchQuery}".
                 </td>
               </tr>
             ) : (

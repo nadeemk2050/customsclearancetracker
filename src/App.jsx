@@ -303,6 +303,22 @@ export function App() {
     }
   };
 
+  const handleUpdateShipmentAttachments = async (shipmentId, newBlDocuments) => {
+    const current = shipments.find(s => s.id === shipmentId) || dossierShipment;
+    if (!current) return;
+    const updatedShipment = {
+      ...current,
+      blDocuments: newBlDocuments,
+      updatedAt: new Date().toISOString(),
+      updatedBy: session?.displayName || session?.username || 'User'
+    };
+    const newList = await persistShipment(updatedShipment, shipments, activeCompanyId);
+    setShipments(newList);
+    setSyncStatus({ pending: true });
+    setDossierShipment(updatedShipment);
+    return updatedShipment;
+  };
+
   const handleDeleteShipment = async (id) => {
     if (!requestActionPassword('permanently delete this Bill of Lading (BL) shipment')) return;
     if (window.confirm('⚠️ Are you sure you want to delete this Bill of Lading shipment record? This action cannot be undone.')) {
@@ -576,6 +592,9 @@ export function App() {
         onEdit={handleEditShipment}
         onUpdateStatus={handleQuickUpdateStatus}
         companyName={session?.companyName || 'CustomsTrack PRO'}
+        companyId={activeCompanyId}
+        currentUser={session}
+        onUpdateShipment={handleUpdateShipmentAttachments}
       />
 
       {/* Backup & Archival Modal */}
