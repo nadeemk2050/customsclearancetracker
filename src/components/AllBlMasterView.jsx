@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ArrowRight } from 'lucide-react';
+import { Search, ArrowRight, Briefcase } from 'lucide-react';
 
 export const AllBlMasterView = ({ 
   shipments = [], 
@@ -13,6 +13,8 @@ export const AllBlMasterView = ({
     const q = search.trim().toLowerCase();
     if (!q) return true;
     const bl = String(s.blNo || '').toLowerCase();
+    const dealer = String(s.dealerName || '').toLowerCase();
+    const lot = String(s.lotNo || '').toLowerCase();
     const vessel = String(s.vessel || '').toLowerCase();
     const cust = String(s.consignee || '').toLowerCase();
     const pol = String(s.pol || '').toLowerCase();
@@ -21,6 +23,8 @@ export const AllBlMasterView = ({
     const containers = (s.containers || []).map(c => String(c.containerNumber || c.containerNo || '')).join(' ').toLowerCase();
 
     return bl.includes(q) || 
+           dealer.includes(q) ||
+           lot.includes(q) ||
            vessel.includes(q) || 
            cust.includes(q) || 
            pol.includes(q) || 
@@ -183,6 +187,8 @@ export const AllBlMasterView = ({
             }}>
               <th style={{ ...thStyle, width: '32px' }}>#</th>
               <th style={{ ...thStyle, minWidth: '134px' }}>BL NUMBER</th>
+              <th style={{ ...thStyle, minWidth: '150px' }}>DEALER NAME</th>
+              <th style={{ ...thStyle, minWidth: '110px' }}>LOT NO.</th>
               <th style={{ ...thStyle, minWidth: '112px' }}>VESSEL</th>
               <th style={{ ...thStyle, minWidth: '130px' }}>CUSTOMER</th>
               <th style={{ ...thStyle, minWidth: '118px' }}>CONTAINER NUMBER(S)</th>
@@ -201,7 +207,7 @@ export const AllBlMasterView = ({
           <tbody>
             {filteredShipments.length === 0 ? (
               <tr>
-                <td colSpan="13" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
+                <td colSpan="15" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
                   No BL consignments found matching "{search}".
                 </td>
               </tr>
@@ -280,7 +286,48 @@ export const AllBlMasterView = ({
                       </span>
                     </td>
 
-                    {/* 3. VESSEL */}
+                    {/* 3. DEALER NAME in Sky Blue */}
+                    <td style={{ padding: '8px 10px' }}>
+                      {s.dealerName ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <Briefcase size={13} style={{ color: '#38bdf8', flexShrink: 0 }} />
+                          <span style={{ 
+                            color: '#38bdf8', 
+                            fontWeight: 700, 
+                            fontSize: '0.78rem',
+                            letterSpacing: '0.01em'
+                          }}>
+                            {s.dealerName}
+                          </span>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#475569' }}>—</span>
+                      )}
+                    </td>
+
+                    {/* 4. LOT NO in Purple Badge */}
+                    <td style={{ padding: '8px 10px' }}>
+                      {s.lotNo ? (
+                        <span style={{ 
+                          color: '#c084fc', 
+                          fontFamily: 'monospace', 
+                          fontWeight: 800,
+                          fontSize: '0.75rem',
+                          background: 'rgba(192, 132, 252, 0.12)',
+                          padding: '2px 8px',
+                          borderRadius: '5px',
+                          border: '1px solid rgba(192, 132, 252, 0.3)',
+                          letterSpacing: '0.02em',
+                          display: 'inline-block'
+                        }}>
+                          {s.lotNo}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#475569' }}>—</span>
+                      )}
+                    </td>
+
+                    {/* 5. VESSEL */}
                     <td style={{ padding: '8px 10px', color: '#cbd5e1', fontWeight: 500 }}>
                       {vesselDisplay}
                     </td>

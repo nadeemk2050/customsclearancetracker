@@ -141,6 +141,8 @@ export function App() {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const blMatch = shipment.blNo?.toLowerCase().includes(q);
+        const dealerMatch = shipment.dealerName?.toLowerCase().includes(q);
+        const lotMatch = shipment.lotNo?.toLowerCase().includes(q);
         const consigneeMatch = shipment.consignee?.toLowerCase().includes(q);
         const shipperMatch = shipment.shipper?.toLowerCase().includes(q);
         const vesselMatch = shipment.vessel?.toLowerCase().includes(q);
@@ -150,7 +152,7 @@ export function App() {
         const cargoMatch = shipment.cargoDescription?.toLowerCase().includes(q);
         const containerMatch = shipment.containers?.some(c => c.containerNo?.toLowerCase().includes(q));
 
-        if (!blMatch && !consigneeMatch && !shipperMatch && !vesselMatch && !podMatch && !hsMatch && !boeMatch && !cargoMatch && !containerMatch) {
+        if (!blMatch && !dealerMatch && !lotMatch && !consigneeMatch && !shipperMatch && !vesselMatch && !podMatch && !hsMatch && !boeMatch && !cargoMatch && !containerMatch) {
           return false;
         }
       }
@@ -461,6 +463,7 @@ export function App() {
         masters={masters}
         companyId={activeCompanyId}
         currentUser={session}
+        existingShipments={shipments}
       />
 
       {/* Manage Masters Modal */}

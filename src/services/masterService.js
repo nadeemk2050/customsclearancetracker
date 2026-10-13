@@ -57,6 +57,46 @@ export const INITIAL_MASTERS = {
     { id: 'dpt_2', name: 'Maersk Maasvlakte Depot', shippingLine: 'Maersk Line', location: 'Maasvlakte 2 Haven 9100', workingHours: '24 Hours' },
     { id: 'dpt_3', name: 'MSC Al-Khafji Logistics Depot', shippingLine: 'MSC', location: 'Dammam Industrial Port Road', workingHours: '07:00 - 19:00' },
     { id: 'dpt_4', name: 'COSCO Concor Yard Nhava Sheva', shippingLine: 'COSCO Shipping', location: 'JNPT Dronagiri CFS Hub', workingHours: '24 Hours' }
+  ],
+
+  dealers: [
+    {
+      id: 'dlr_1',
+      name: 'AL-ZAHRA TRADING & INVESTMENTS',
+      contactPerson: 'Hassan Al-Zahra',
+      phone: '+971 50 234 5678',
+      email: 'hassan@alzahrainvest.com',
+      address: 'Deira Business Hub, Suite 402, Dubai, UAE',
+      trn: '100456789000003',
+      notes: 'Principal investor/indentor for polymer and packaging materials'
+    },
+    {
+      id: 'dlr_2',
+      name: 'GLOBAL METALS & COMMODITIES INDENTORS',
+      contactPerson: 'Suresh Patel',
+      phone: '+971 55 876 5432',
+      email: 'spatel@globalindentors.ae',
+      address: 'JLT Cluster W, Office 1402, Dubai, UAE',
+      trn: '100987654300003',
+      notes: 'Industrial hardware and fastener supply financing'
+    }
+  ],
+
+  lots: [
+    {
+      id: 'lot_1',
+      lotNo: 'LOT-2026-001',
+      dealerName: 'AL-ZAHRA TRADING & INVESTMENTS',
+      description: 'Polymer Raw Granules Consignment Batch 1',
+      notes: 'Mumtaz Plastic recycling line allocation'
+    },
+    {
+      id: 'lot_2',
+      lotNo: 'LOT-2026-002',
+      dealerName: 'GLOBAL METALS & COMMODITIES INDENTORS',
+      description: 'Precision Stainless Steel Fasteners Batch A',
+      notes: 'Q4 Industrial Hardware allocation'
+    }
   ]
 };
 
@@ -71,7 +111,9 @@ export const getLocalMasters = (companyId = 'cha_al_mumtaz') => {
       if (parsed && typeof parsed === 'object') {
         return {
           ...INITIAL_MASTERS,
-          ...parsed
+          ...parsed,
+          dealers: parsed.dealers && parsed.dealers.length > 0 ? parsed.dealers : INITIAL_MASTERS.dealers,
+          lots: parsed.lots && parsed.lots.length > 0 ? parsed.lots : INITIAL_MASTERS.lots
         };
       }
     }
@@ -102,7 +144,12 @@ export const subscribeToMasters = (companyId = 'cha_al_mumtaz', onData) => {
   getDoc(docRef).then((docSnap) => {
     if (docSnap.exists()) {
       const remoteData = docSnap.data();
-      const merged = { ...INITIAL_MASTERS, ...remoteData };
+      const merged = { 
+        ...INITIAL_MASTERS, 
+        ...remoteData,
+        dealers: remoteData?.dealers && remoteData.dealers.length > 0 ? remoteData.dealers : (local.dealers || INITIAL_MASTERS.dealers),
+        lots: remoteData?.lots && remoteData.lots.length > 0 ? remoteData.lots : (local.lots || INITIAL_MASTERS.lots)
+      };
       saveLocalMasters(merged, companyId);
       onData(merged);
     }

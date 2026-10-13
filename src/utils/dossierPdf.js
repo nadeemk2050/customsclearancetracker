@@ -221,6 +221,8 @@ export const buildDossierPdf = async ({ shipment, companyName = 'CustomsTrack PR
   sectionTitle('Consignment & Routing');
   keyValueRows([
     ['BL Number', shipment.blNo],
+    ['Dealer Name', shipment.dealerName],
+    ['Lot Number', shipment.lotNo],
     ['Shipping Line', shipment.shippingLine],
     ['Vessel / Voyage', `${value(shipment.vessel, '-')}${shipment.voyage ? ' / ' + shipment.voyage : ''}`],
     ['Port of Loading', shipment.pol],

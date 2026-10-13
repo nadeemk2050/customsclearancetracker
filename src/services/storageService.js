@@ -17,6 +17,8 @@ export const INITIAL_CCT_DATA = [
   {
     id: 'CCT-2026-001',
     blNo: 'HLCUTOR260620111',
+    dealerName: 'AL-ZAHRA TRADING & INVESTMENTS',
+    lotNo: 'LOT-2026-001',
     shippingLine: 'Hapag-Lloyd',
     vessel: 'AL ZUBARA',
     voyage: '2604E',
@@ -422,6 +424,8 @@ export const exportToJsonFile = (shipments, companyName = 'CustomsTrack_Pro') =>
 export const exportToCsvFile = (shipments, companyName = 'CustomsTrack_Pro') => {
   const headers = [
     'BL Number',
+    'Dealer Name',
+    'Lot No',
     'Shipping Line',
     'Vessel',
     'Voyage',
@@ -444,6 +448,8 @@ export const exportToCsvFile = (shipments, companyName = 'CustomsTrack_Pro') => 
     const containerList = (s.containers || []).map(c => `${c.containerNo} (${c.sizeType})`).join('; ');
     return [
       `"${s.blNo || ''}"`,
+      `"${s.dealerName || ''}"`,
+      `"${s.lotNo || ''}"`,
       `"${s.shippingLine || ''}"`,
       `"${s.vessel || ''}"`,
       `"${s.voyage || ''}"`,

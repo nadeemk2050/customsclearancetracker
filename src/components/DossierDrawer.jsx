@@ -79,6 +79,16 @@ export const DossierDrawer = ({
                 <h2 className="text-xl font-extrabold text-slate-800 font-mono tracking-tight">
                   BL: {shipment.blNo}
                 </h2>
+                {shipment.dealerName && (
+                  <span className="carrier-tag text-xs font-bold bg-sky-100 text-sky-900 border border-sky-300" title="Dealer (Investor / Indentor)">
+                    Dealer: {shipment.dealerName}
+                  </span>
+                )}
+                {shipment.lotNo && (
+                  <span className="carrier-tag text-xs font-mono font-bold bg-purple-100 text-purple-900 border border-purple-300" title="Consignment Lot Number">
+                    Lot: {shipment.lotNo}
+                  </span>
+                )}
                 <span className="carrier-tag text-xs font-bold bg-blue-100 text-blue-900">
                   {shipment.shippingLine}
                 </span>
@@ -334,6 +344,14 @@ export const DossierDrawer = ({
 
           {/* Dossier Specifications Grid */}
           <div className="dossier-grid">
+            <div className="dossier-item">
+              <span>Dealer (Investor / Indentor)</span>
+              <strong className="text-sky-700 font-bold">{shipment.dealerName || '—'}</strong>
+            </div>
+            <div className="dossier-item">
+              <span>Consignment Lot Number</span>
+              <strong className="font-mono text-purple-700 font-bold">{shipment.lotNo || '—'}</strong>
+            </div>
             <div className="dossier-item">
               <span>Consignee (Importer)</span>
               <strong>{shipment.consignee || '—'}</strong>

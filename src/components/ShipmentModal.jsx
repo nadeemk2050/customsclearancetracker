@@ -38,6 +38,8 @@ const DEFAULT_CONTAINER = {
 // whatever value the record already had, so nothing is lost when saving.
 const DEFAULT_SHIPMENT = {
   blNo: '',
+  dealerName: '',
+  lotNo: '',
   shippingLine: '',
   vessel: '',
   voyage: '',
@@ -183,7 +185,8 @@ export const ShipmentModal = ({
   onSave,
   masters = {},
   companyId = 'default',
-  currentUser = null
+  currentUser = null,
+  existingShipments = []
 }) => {
   const [formData, setFormData] = useState(DEFAULT_SHIPMENT);
   const [openSections, setOpenSections] = useState({
@@ -201,6 +204,8 @@ export const ShipmentModal = ({
   const shippers = (masters.shippers || []).map((item) => item.name);
   const ports = (masters.ports || []).map((port) => port.name);
   const cargoItems = masters.cargoDescriptions || [];
+  const dealers = masters.dealers || [];
+  const lots = masters.lots || [];
 
   // Depots are filtered by the selected carrier, falling back to the full list
   const depotOptions = useMemo(() => {
@@ -291,6 +296,23 @@ export const ShipmentModal = ({
   };
 
   // Master auto-fills
+  const handleDealerSelect = (dealerName) => {
+    setFormData((prev) => ({
+      ...prev,
+      dealerName
+    }));
+  };
+
+  const handleLotSelect = (lotValue) => {
+    const cleanLot = lotValue.toUpperCase();
+    const matched = (masters.lots || []).find((l) => (l.lotNo || l.name || '').toUpperCase() === cleanLot);
+    setFormData((prev) => ({
+      ...prev,
+      lotNo: cleanLot,
+      dealerName: matched?.dealerName ? matched.dealerName : (prev.dealerName || '')
+    }));
+  };
+
   const handleShippingLineSelect = (lineName) => {
     const matched = (masters.shippingLines || []).find((line) => line.name === lineName);
     setFormData((prev) => ({
@@ -374,6 +396,49 @@ export const ShipmentModal = ({
 
   const validate = () => {
     if (!formData.blNo.trim()) return { message: 'Bill of Lading (BL) Number is required.', section: 'carrier' };
+
+    // Duplicate BL Number Validation
+    const blUpper = formData.blNo.trim().toUpperCase();
+    const isDupBl = (existingShipments || []).some((s) =>
+      s.id !== formData.id &&
+      (s.blNo || '').trim().toUpperCase() === blUpper
+    );
+    if (isDupBl) {
+      return {
+        message: `❌ Duplicate BL Error: Bill of Lading "${blUpper}" already exists in the system. BL numbers must be unique.`,
+        section: 'carrier'
+      };
+    }
+
+    // Dealer & Lot Conflict / Duplicate Validation
+    if (formData.lotNo?.trim() && formData.dealerName?.trim()) {
+      const curLot = formData.lotNo.trim().toUpperCase();
+      const curDealer = formData.dealerName.trim().toUpperCase();
+
+      // Check Lot Master: if this lot was registered under a different dealer
+      const masterLot = (masters.lots || []).find((l) => (l.lotNo || l.name || '').trim().toUpperCase() === curLot);
+      if (masterLot && masterLot.dealerName && masterLot.dealerName.trim().toUpperCase() !== curDealer) {
+        return {
+          message: `❌ Dealer / Lot Conflict: Lot Number "${formData.lotNo.trim()}" belongs to master dealer "${masterLot.dealerName}". It cannot be used under dealer "${formData.dealerName.trim()}".`,
+          section: 'carrier'
+        };
+      }
+
+      // Check existing shipments: ensure Lot No is not assigned to another dealer
+      const conflictShipment = (existingShipments || []).find((s) =>
+        s.id !== formData.id &&
+        (s.lotNo || '').trim().toUpperCase() === curLot &&
+        (s.dealerName || '').trim() &&
+        (s.dealerName || '').trim().toUpperCase() !== curDealer
+      );
+      if (conflictShipment) {
+        return {
+          message: `❌ Dealer / Lot Conflict: Lot Number "${formData.lotNo.trim()}" is already assigned to dealer "${conflictShipment.dealerName}" (BL: ${conflictShipment.blNo}). A Lot Number cannot be shared across different dealers.`,
+          section: 'carrier'
+        };
+      }
+    }
+
     if (!formData.shippingLine.trim()) return { message: 'Shipping Line / Carrier is required.', section: 'carrier' };
     if (!formData.pod.trim()) return { message: 'Port of Discharge (POD) is required.', section: 'routing' };
     if (!formData.consignee.trim()) return { message: 'Consignee (Importer) is required.', section: 'routing' };
@@ -400,6 +465,8 @@ export const ShipmentModal = ({
     onSave({
       ...formData,
       blNo: formData.blNo.trim().toUpperCase(),
+      dealerName: formData.dealerName?.trim() || '',
+      lotNo: formData.lotNo?.trim().toUpperCase() || '',
       // Keep the manifest aligned with the vessel discharge date
       containers: formData.containers.map((container) => ({
         ...container,
@@ -415,6 +482,14 @@ export const ShipmentModal = ({
   return (
     <div className="bl-form-page" role="dialog" aria-modal="true" aria-label="BL consignment details">
       {/* Master data powering the dropdowns (typing a new value stays possible) */}
+      <datalist id="master-dealers">{dealers.map((d) => <option key={d.id || d.name} value={d.name} />)}</datalist>
+      <datalist id="master-lots">
+        {lots.map((l) => (
+          <option key={l.id || l.lotNo} value={l.lotNo}>
+            {l.dealerName ? `Dealer: ${l.dealerName}` : ''}
+          </option>
+        ))}
+      </datalist>
       <datalist id="master-shipping-lines">{shippingLines.map((name) => <option key={name} value={name} />)}</datalist>
       <datalist id="master-consignees">{consignees.map((item) => <option key={item.id || item.name} value={item.name} />)}</datalist>
       <datalist id="master-shippers">{shippers.map((name) => <option key={name} value={name} />)}</datalist>
@@ -444,6 +519,8 @@ export const ShipmentModal = ({
             <p>
               {containerCount} container unit(s)
               {formData.blNo ? ' | BL ' + formData.blNo : ''}
+              {formData.dealerName ? ' | Dealer: ' + formData.dealerName : ''}
+              {formData.lotNo ? ' | Lot: ' + formData.lotNo : ''}
               {formData.customsStatus ? ' | ' + formData.customsStatus : ''}
             </p>
           </div>
@@ -474,7 +551,7 @@ export const ShipmentModal = ({
             step="1"
             title="BL and Ship Details"
             Icon={Ship}
-            meta={formData.shippingLine || ''}
+            meta={formData.dealerName || formData.shippingLine || ''}
           >
             <div className="bl-form-grid">
               <Field
@@ -485,6 +562,25 @@ export const ShipmentModal = ({
                 value={formData.blNo}
                 onChange={(value) => handleInputChange('blNo', value.toUpperCase())}
                 placeholder="e.g. HLCUTOR260620111"
+              />
+              <Field
+                id="bl-dealer"
+                listId="master-dealers"
+                label="Dealer Name (Investor / Indentor)"
+                value={formData.dealerName}
+                onChange={handleDealerSelect}
+                placeholder="Select master dealer or type..."
+                hint="Main investor/indentor financing or owning the shipment"
+              />
+              <Field
+                id="bl-lot-no"
+                listId="master-lots"
+                label="Lot Number"
+                mono
+                value={formData.lotNo}
+                onChange={handleLotSelect}
+                placeholder="e.g. LOT-2026-001"
+                hint="Consignment lot allocation (bound to dealer)"
               />
               <Field
                 id="bl-carrier"

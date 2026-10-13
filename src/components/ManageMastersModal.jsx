@@ -13,11 +13,15 @@ import {
   Box, 
   Warehouse,
   CheckCircle,
-  Database
+  Database,
+  Briefcase,
+  Layers
 } from 'lucide-react';
 import { requestActionPassword } from '../utils/securityGate';
 
 const TABS = [
+  { key: 'dealers', label: 'Dealers (Investors/Indentors)', icon: Briefcase },
+  { key: 'lots', label: 'Lot Numbers', icon: Layers },
   { key: 'shippingLines', label: 'Shipping Lines', icon: Ship },
   { key: 'consignees', label: 'Consignees (Importers)', icon: Building2 },
   { key: 'shippers', label: 'Shippers (Exporters)', icon: Truck },
@@ -32,7 +36,7 @@ export const ManageMastersModal = ({
   masters = {}, 
   onSaveMasters 
 }) => {
-  const [activeTab, setActiveTab] = useState('shippingLines');
+  const [activeTab, setActiveTab] = useState('dealers');
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -47,7 +51,12 @@ export const ManageMastersModal = ({
 
   const handleAddNew = () => {
     let blankItem = { id: 'item_' + Date.now() };
-    if (activeTab === 'shippingLines') {
+    if (activeTab === 'dealers') {
+      blankItem = { ...blankItem, name: '', contactPerson: '', phone: '', email: '', address: '', trn: '', notes: '' };
+    } else if (activeTab === 'lots') {
+      const defaultDealer = (masters.dealers && masters.dealers[0]?.name) || '';
+      blankItem = { ...blankItem, lotNo: '', dealerName: defaultDealer, description: '', notes: '' };
+    } else if (activeTab === 'shippingLines') {
       blankItem = { ...blankItem, name: '', scac: '', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 80, contactEmail: '', phone: '' };
     } else if (activeTab === 'consignees') {
       blankItem = { ...blankItem, name: '', address: '', trn: '', contactPerson: '', phone: '', email: '', destinationYard: '' };
@@ -83,6 +92,54 @@ export const ManageMastersModal = ({
   const handleSaveItem = (e) => {
     e.preventDefault();
     const currentList = masters[activeTab] || [];
+
+    // 1. Strict Duplicate Prevention for Dealers
+    if (activeTab === 'dealers') {
+      const dealerName = (editItem.name || '').trim();
+      if (!dealerName) {
+        alert('❌ Dealer Name is required.');
+        return;
+      }
+      const isDuplicate = currentList.some(item => 
+        item.id !== editItem.id && 
+        (item.name || '').trim().toLowerCase() === dealerName.toLowerCase()
+      );
+      if (isDuplicate) {
+        alert(`❌ Duplicate Dealer Error: A Dealer named "${dealerName}" already exists. Dealer names must be unique and cannot be duplicated across multiple records.`);
+        return;
+      }
+    }
+
+    // 2. Strict Duplicate Prevention for Lot Numbers
+    if (activeTab === 'lots') {
+      const lotNumber = (editItem.lotNo || editItem.name || '').trim();
+      if (!lotNumber) {
+        alert('❌ Lot Number is required.');
+        return;
+      }
+      const isDuplicate = currentList.some(item => 
+        item.id !== editItem.id && 
+        (item.lotNo || item.name || '').trim().toLowerCase() === lotNumber.toLowerCase()
+      );
+      if (isDuplicate) {
+        alert(`❌ Duplicate Lot Error: Lot Number "${lotNumber}" already exists. Lot numbers must be unique.`);
+        return;
+      }
+    }
+
+    // 3. Strict Duplicate Prevention for Shipping Lines
+    if (activeTab === 'shippingLines') {
+      const lineName = (editItem.name || '').trim();
+      const isDuplicate = currentList.some(item => 
+        item.id !== editItem.id && 
+        (item.name || '').trim().toLowerCase() === lineName.toLowerCase()
+      );
+      if (isDuplicate) {
+        alert(`❌ Duplicate Error: Shipping Line "${lineName}" already exists.`);
+        return;
+      }
+    }
+
     const exists = currentList.some(item => item.id === editItem.id);
     let updatedList;
     if (exists) {
@@ -227,6 +284,165 @@ export const ManageMastersModal = ({
               </div>
 
               {/* Form Fields by Tab */}
+              {activeTab === 'dealers' && (
+                <div className="masters-form-grid">
+                  <div className="form-full">
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Dealer / Investor / Indentor Name *
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      className="form-control font-bold"
+                      value={editItem.name || ''}
+                      onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
+                      placeholder="e.g. AL-ZAHRA TRADING & INVESTMENTS"
+                    />
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                      Primary financier or indentor. Must be unique — duplicate dealer names are prohibited.
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Contact Person
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editItem.contactPerson || ''}
+                      onChange={(e) => setEditItem({ ...editItem, contactPerson: e.target.value })}
+                      placeholder="e.g. Hassan Al-Zahra"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Contact Phone / Mobile
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control font-mono"
+                      value={editItem.phone || ''}
+                      onChange={(e) => setEditItem({ ...editItem, phone: e.target.value })}
+                      placeholder="+971 50 234 5678"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Contact Email
+                    </label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      value={editItem.email || ''}
+                      onChange={(e) => setEditItem({ ...editItem, email: e.target.value })}
+                      placeholder="investor@alzahra.com"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Tax / VAT / TRN / Reg #
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control font-mono"
+                      value={editItem.trn || ''}
+                      onChange={(e) => setEditItem({ ...editItem, trn: e.target.value })}
+                      placeholder="TRN 100456789000003"
+                    />
+                  </div>
+                  <div className="form-full">
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Official Business Address
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editItem.address || ''}
+                      onChange={(e) => setEditItem({ ...editItem, address: e.target.value })}
+                      placeholder="Suite / Floor, Building, Street, City, Country"
+                    />
+                  </div>
+                  <div className="form-full">
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Commercial Remarks / Notes
+                    </label>
+                    <textarea
+                      rows={2}
+                      className="form-control"
+                      value={editItem.notes || ''}
+                      onChange={(e) => setEditItem({ ...editItem, notes: e.target.value })}
+                      placeholder="Investment arrangements, indenting contracts, or financing facilities..."
+                    />
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'lots' && (
+                <div className="masters-form-grid">
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Lot Number *
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      className="form-control font-mono uppercase font-bold"
+                      value={editItem.lotNo || editItem.name || ''}
+                      onChange={(e) => setEditItem({ ...editItem, lotNo: e.target.value.toUpperCase() })}
+                      placeholder="e.g. LOT-2026-001"
+                    />
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                      Unique batch/consignment lot number. Duplicate lots are blocked.
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Associated Dealer (Investor / Indentor)
+                    </label>
+                    <input
+                      type="text"
+                      list="manage-dealers-list"
+                      className="form-control font-bold"
+                      value={editItem.dealerName || ''}
+                      onChange={(e) => setEditItem({ ...editItem, dealerName: e.target.value })}
+                      placeholder="Select dealer or type..."
+                    />
+                    <datalist id="manage-dealers-list">
+                      {(masters.dealers || []).map(d => (
+                        <option key={d.id || d.name} value={d.name} />
+                      ))}
+                    </datalist>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                      Binds this lot to the designated dealer.
+                    </div>
+                  </div>
+                  <div className="form-full">
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Lot Description / Cargo Allocation
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editItem.description || ''}
+                      onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
+                      placeholder="e.g. Polymer Raw Granules Consignment Batch 1"
+                    />
+                  </div>
+                  <div className="form-full">
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Batch Notes / Instructions
+                    </label>
+                    <textarea
+                      rows={2}
+                      className="form-control"
+                      value={editItem.notes || ''}
+                      onChange={(e) => setEditItem({ ...editItem, notes: e.target.value })}
+                      placeholder="Consignment quantity allocation, warehouse routing details..."
+                    />
+                  </div>
+                </div>
+              )}
+
               {activeTab === 'shippingLines' && (
                 <div className="masters-form-grid">
                   <div>
@@ -665,6 +881,21 @@ export const ManageMastersModal = ({
                 <thead>
                   <tr>
                     <th>Name / Description</th>
+                    {activeTab === 'dealers' && (
+                      <>
+                        <th>Contact Person</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>TRN / Tax #</th>
+                      </>
+                    )}
+                    {activeTab === 'lots' && (
+                      <>
+                        <th>Associated Dealer</th>
+                        <th>Description / Cargo</th>
+                        <th>Remarks / Notes</th>
+                      </>
+                    )}
                     {activeTab === 'shippingLines' && (
                       <>
                         <th>SCAC Code</th>
@@ -724,9 +955,30 @@ export const ManageMastersModal = ({
                       <tr key={item.id}>
                         <td>
                           <strong style={{ color: '#0f172a', fontWeight: 700 }}>
-                            {item.name || item.description}
+                            {item.lotNo || item.name || item.description}
                           </strong>
                         </td>
+
+                        {activeTab === 'dealers' && (
+                          <>
+                            <td>{item.contactPerson || '—'}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)' }}>{item.phone || '—'}</td>
+                            <td style={{ color: '#2563eb' }}>{item.email || '—'}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)' }}>{item.trn || '—'}</td>
+                          </>
+                        )}
+
+                        {activeTab === 'lots' && (
+                          <>
+                            <td>
+                              <strong style={{ color: '#0284c7' }}>{item.dealerName || '—'}</strong>
+                            </td>
+                            <td style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.description}>
+                              {item.description || '—'}
+                            </td>
+                            <td style={{ color: '#64748b' }}>{item.notes || '—'}</td>
+                          </>
+                        )}
 
                         {activeTab === 'shippingLines' && (
                           <>

@@ -183,6 +183,20 @@ export const ShipmentTable = ({
                         <div className="text-[11px] text-slate-400 font-mono mt-0.5">
                           {shipment.vessel ? `${shipment.vessel} / ${shipment.voyage || ''}` : 'Vessel TBD'}
                         </div>
+                        {(shipment.dealerName || shipment.lotNo) && (
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            {shipment.dealerName && (
+                              <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200" title={`Dealer: ${shipment.dealerName}`}>
+                                {shipment.dealerName}
+                              </span>
+                            )}
+                            {shipment.lotNo && (
+                              <span className="text-[10px] font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200" title={`Lot: ${shipment.lotNo}`}>
+                                #{shipment.lotNo}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       {/* Routing & Cargo */}
