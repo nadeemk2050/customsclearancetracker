@@ -34,9 +34,30 @@ const DEFAULT_CONTAINER = {
   status: 'At Port (Full)'
 };
 
+export const generateNextCctRefNo = (existingShipments = []) => {
+  const currentYear = new Date().getFullYear();
+  const prefix = `CCT-${currentYear}-`;
+  let maxSeq = 0;
+
+  (existingShipments || []).forEach((s) => {
+    const candidate = String(s.cctRefNo || s.id || '').toUpperCase().trim();
+    const match = candidate.match(/^CCT-(?:\d{4}-)?(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxSeq) {
+        maxSeq = num;
+      }
+    }
+  });
+
+  const nextSeq = String(maxSeq + 1).padStart(3, '0');
+  return `${prefix}${nextSeq}`;
+};
+
 // Only the fields shown on this page are edited here. Every other dossier field keeps
 // whatever value the record already had, so nothing is lost when saving.
 const DEFAULT_SHIPMENT = {
+  cctRefNo: '',
   blNo: '',
   dealerName: '',
   lotNo: '',
@@ -219,6 +240,7 @@ export const ShipmentModal = ({
       setFormData({
         ...DEFAULT_SHIPMENT,
         ...shipmentToEdit,
+        cctRefNo: shipmentToEdit.cctRefNo || shipmentToEdit.id || '',
         doSecurityDeposit: {
           ...DEFAULT_SHIPMENT.doSecurityDeposit,
           ...(shipmentToEdit.doSecurityDeposit || {})
@@ -236,15 +258,17 @@ export const ShipmentModal = ({
           : [{ ...DEFAULT_CONTAINER, id: 'c_' + Date.now() }]
       });
     } else {
+      const nextRef = generateNextCctRefNo(existingShipments);
       setFormData({
         ...DEFAULT_SHIPMENT,
+        cctRefNo: nextRef,
         // Stable id up front so BL attachments can be stored before the first save
-        id: 'CCT-' + Date.now(),
+        id: nextRef || ('CCT-' + Date.now()),
         containers: [{ ...DEFAULT_CONTAINER, id: 'c_' + Date.now() }]
       });
     }
     setError('');
-  }, [shipmentToEdit, isOpen]);
+  }, [shipmentToEdit, isOpen, existingShipments]);
 
   // Free-time countdowns: how many days remain, not what they would cost
   const freeTime = useMemo(() => {
@@ -395,6 +419,23 @@ export const ShipmentModal = ({
   };
 
   const validate = () => {
+    // 1. CCT Reference Number Validation
+    if (!formData.cctRefNo || !formData.cctRefNo.trim()) {
+      return { message: 'CCT Reference Number is required.', section: 'carrier' };
+    }
+
+    const cctUpper = formData.cctRefNo.trim().toUpperCase();
+    const isDupCct = (existingShipments || []).some((s) =>
+      s.id !== formData.id &&
+      (s.cctRefNo || s.id || '').trim().toUpperCase() === cctUpper
+    );
+    if (isDupCct) {
+      return {
+        message: `❌ Duplicate CCT Ref Error: CCT Reference Number "${cctUpper}" already exists in the system. CCT References must be unique.`,
+        section: 'carrier'
+      };
+    }
+
     if (!formData.blNo.trim()) return { message: 'Bill of Lading (BL) Number is required.', section: 'carrier' };
 
     // Duplicate BL Number Validation
@@ -464,6 +505,7 @@ export const ShipmentModal = ({
 
     onSave({
       ...formData,
+      cctRefNo: formData.cctRefNo.trim().toUpperCase(),
       blNo: formData.blNo.trim().toUpperCase(),
       dealerName: formData.dealerName?.trim() || '',
       lotNo: formData.lotNo?.trim().toUpperCase() || '',
@@ -518,6 +560,7 @@ export const ShipmentModal = ({
             <h2>{shipmentToEdit ? 'Edit BLs Consignment - ' + shipmentToEdit.blNo : 'Add New BL Consignment'}</h2>
             <p>
               {containerCount} container unit(s)
+              {formData.cctRefNo ? ' | CCT: ' + formData.cctRefNo : ''}
               {formData.blNo ? ' | BL ' + formData.blNo : ''}
               {formData.dealerName ? ' | Dealer: ' + formData.dealerName : ''}
               {formData.lotNo ? ' | Lot: ' + formData.lotNo : ''}
@@ -551,9 +594,43 @@ export const ShipmentModal = ({
             step="1"
             title="BL and Ship Details"
             Icon={Ship}
-            meta={formData.dealerName || formData.shippingLine || ''}
+            meta={formData.cctRefNo ? `CCT: ${formData.cctRefNo}` : (formData.dealerName || formData.shippingLine || '')}
           >
             <div className="bl-form-grid">
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label className="bl-label" htmlFor="cct-ref-no" style={{ margin: 0 }}>
+                    {labelText('CCT Reference Number', true)}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('cctRefNo', generateNextCctRefNo(existingShipments))}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#2563eb',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      padding: 0,
+                      textDecoration: 'underline'
+                    }}
+                    title="Generate next available sequential CCT Reference"
+                  >
+                    Auto-Generate
+                  </button>
+                </div>
+                <input
+                  id="cct-ref-no"
+                  type="text"
+                  className="bl-input mono font-bold"
+                  value={formData.cctRefNo || ''}
+                  onChange={(event) => handleInputChange('cctRefNo', event.target.value.toUpperCase())}
+                  placeholder="e.g. CCT-2026-001"
+                />
+                <div className="bl-hint">Universal ABC tracker ID (Auto-generated or custom editable)</div>
+              </div>
+
               <Field
                 id="bl-no"
                 label="Bill of Lading (BL) Number"

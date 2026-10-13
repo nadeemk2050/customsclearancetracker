@@ -140,6 +140,7 @@ export function App() {
       // 1. Text Query Filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
+        const cctMatch = (shipment.cctRefNo || shipment.id)?.toLowerCase().includes(q);
         const blMatch = shipment.blNo?.toLowerCase().includes(q);
         const dealerMatch = shipment.dealerName?.toLowerCase().includes(q);
         const lotMatch = shipment.lotNo?.toLowerCase().includes(q);
@@ -152,7 +153,7 @@ export function App() {
         const cargoMatch = shipment.cargoDescription?.toLowerCase().includes(q);
         const containerMatch = shipment.containers?.some(c => c.containerNo?.toLowerCase().includes(q));
 
-        if (!blMatch && !dealerMatch && !lotMatch && !consigneeMatch && !shipperMatch && !vesselMatch && !podMatch && !hsMatch && !boeMatch && !cargoMatch && !containerMatch) {
+        if (!cctMatch && !blMatch && !dealerMatch && !lotMatch && !consigneeMatch && !shipperMatch && !vesselMatch && !podMatch && !hsMatch && !boeMatch && !cargoMatch && !containerMatch) {
           return false;
         }
       }

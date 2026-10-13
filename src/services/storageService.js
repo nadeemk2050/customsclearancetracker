@@ -16,6 +16,7 @@ import {
 export const INITIAL_CCT_DATA = [
   {
     id: 'CCT-2026-001',
+    cctRefNo: 'CCT-2026-001',
     blNo: 'HLCUTOR260620111',
     dealerName: 'AL-ZAHRA TRADING & INVESTMENTS',
     lotNo: 'LOT-2026-001',
@@ -97,6 +98,7 @@ export const INITIAL_CCT_DATA = [
   },
   {
     id: 'CCT-2026-002',
+    cctRefNo: 'CCT-2026-002',
     blNo: 'MEDUX94820155',
     shippingLine: 'MSC',
     vessel: 'MSC GULSUN',
@@ -163,6 +165,7 @@ export const INITIAL_CCT_DATA = [
   },
   {
     id: 'CCT-2026-003',
+    cctRefNo: 'CCT-2026-003',
     blNo: 'MAEU284910482',
     shippingLine: 'Maersk Line',
     vessel: 'MAERSK MC-KINNEY MOLLER',
@@ -423,6 +426,7 @@ export const exportToJsonFile = (shipments, companyName = 'CustomsTrack_Pro') =>
 
 export const exportToCsvFile = (shipments, companyName = 'CustomsTrack_Pro') => {
   const headers = [
+    'CCT Ref Number',
     'BL Number',
     'Dealer Name',
     'Lot No',
@@ -447,6 +451,7 @@ export const exportToCsvFile = (shipments, companyName = 'CustomsTrack_Pro') => 
   const rows = shipments.map(s => {
     const containerList = (s.containers || []).map(c => `${c.containerNo} (${c.sizeType})`).join('; ');
     return [
+      `"${s.cctRefNo || s.id || ''}"`,
       `"${s.blNo || ''}"`,
       `"${s.dealerName || ''}"`,
       `"${s.lotNo || ''}"`,

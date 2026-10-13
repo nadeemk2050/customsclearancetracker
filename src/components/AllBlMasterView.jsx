@@ -12,6 +12,7 @@ export const AllBlMasterView = ({
   const filteredShipments = shipments.filter(s => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
+    const cct = String(s.cctRefNo || s.id || '').toLowerCase();
     const bl = String(s.blNo || '').toLowerCase();
     const dealer = String(s.dealerName || '').toLowerCase();
     const lot = String(s.lotNo || '').toLowerCase();
@@ -22,7 +23,8 @@ export const AllBlMasterView = ({
     const status = String(s.customsStatus || '').toLowerCase();
     const containers = (s.containers || []).map(c => String(c.containerNumber || c.containerNo || '')).join(' ').toLowerCase();
 
-    return bl.includes(q) || 
+    return cct.includes(q) ||
+           bl.includes(q) || 
            dealer.includes(q) ||
            lot.includes(q) ||
            vessel.includes(q) || 
@@ -186,6 +188,7 @@ export const AllBlMasterView = ({
               letterSpacing: '0.04em'
             }}>
               <th style={{ ...thStyle, width: '32px' }}>#</th>
+              <th style={{ ...thStyle, minWidth: '125px' }}>CCT REF NO.</th>
               <th style={{ ...thStyle, minWidth: '134px' }}>BL NUMBER</th>
               <th style={{ ...thStyle, minWidth: '150px' }}>DEALER NAME</th>
               <th style={{ ...thStyle, minWidth: '110px' }}>LOT NO.</th>
@@ -207,7 +210,7 @@ export const AllBlMasterView = ({
           <tbody>
             {filteredShipments.length === 0 ? (
               <tr>
-                <td colSpan="15" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
+                <td colSpan="16" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
                   No BL consignments found matching "{search}".
                 </td>
               </tr>
@@ -273,7 +276,25 @@ export const AllBlMasterView = ({
                       {idx + 1}
                     </td>
 
-                    {/* 2. BL NUMBER in Gold / Amber */}
+                    {/* 2. CCT REF NO in Mint / Emerald Monospace Chip */}
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{ 
+                        color: '#34d399', 
+                        fontWeight: 800, 
+                        fontFamily: 'monospace',
+                        fontSize: '0.76rem',
+                        letterSpacing: '0.03em',
+                        background: 'rgba(16, 185, 129, 0.12)',
+                        padding: '2px 7px',
+                        borderRadius: '5px',
+                        border: '1px solid rgba(16, 185, 129, 0.28)',
+                        display: 'inline-block'
+                      }}>
+                        {s.cctRefNo || s.id || 'CCT-PENDING'}
+                      </span>
+                    </td>
+
+                    {/* 3. BL NUMBER in Gold / Amber */}
                     <td style={{ padding: '8px 10px' }}>
                       <span style={{ 
                         color: '#fbbf24', 

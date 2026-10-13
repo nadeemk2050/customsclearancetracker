@@ -160,13 +160,19 @@ export const ShipmentTable = ({
 
                       {/* BL & Carrier */}
                       <td>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span 
                             className="bl-badge cursor-pointer hover:underline"
                             onClick={() => onViewDossier(shipment)}
                             title="Click to view full dossier"
                           >
                             {shipment.blNo}
+                          </span>
+                          <span 
+                            className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+                            title="CCT Universal Reference Number"
+                          >
+                            {shipment.cctRefNo || shipment.id}
                           </span>
                           <button
                             onClick={() => handleCopy(shipment.blNo, shipment.id)}

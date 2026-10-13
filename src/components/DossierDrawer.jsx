@@ -79,6 +79,9 @@ export const DossierDrawer = ({
                 <h2 className="text-xl font-extrabold text-slate-800 font-mono tracking-tight">
                   BL: {shipment.blNo}
                 </h2>
+                <span className="carrier-tag text-xs font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300" title="CCT Universal Reference Number">
+                  CCT: {shipment.cctRefNo || shipment.id}
+                </span>
                 {shipment.dealerName && (
                   <span className="carrier-tag text-xs font-bold bg-sky-100 text-sky-900 border border-sky-300" title="Dealer (Investor / Indentor)">
                     Dealer: {shipment.dealerName}
@@ -344,6 +347,10 @@ export const DossierDrawer = ({
 
           {/* Dossier Specifications Grid */}
           <div className="dossier-grid">
+            <div className="dossier-item">
+              <span>CCT Reference Number</span>
+              <strong className="font-mono text-emerald-700 font-bold">{shipment.cctRefNo || shipment.id}</strong>
+            </div>
             <div className="dossier-item">
               <span>Dealer (Investor / Indentor)</span>
               <strong className="text-sky-700 font-bold">{shipment.dealerName || '—'}</strong>
