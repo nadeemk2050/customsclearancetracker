@@ -4,9 +4,6 @@ import {
   ShieldAlert, 
   Search, 
   PlusCircle, 
-  Download, 
-  Upload, 
-  FileSpreadsheet, 
   Layers, 
   Globe,
   Menu,
@@ -255,51 +252,6 @@ export const Navbar = ({
                     <div className="menu-item-title">Manage Masters</div>
                     <div className="menu-item-sub">Shipping lines, Consignees, Ports, Cargo</div>
                   </div>
-                </button>
-
-                <div className="menu-divider"></div>
-
-                <div className="menu-header-label">
-                  Offline PC Storage & Archival
-                </div>
-
-                <button
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    onExportCsv();
-                  }}
-                  className="menu-item-action"
-                >
-                  <div className="w-6 h-6 rounded flex items-center justify-center text-emerald-400 bg-emerald-500/10">
-                    <FileSpreadsheet size={15} />
-                  </div>
-                  <span className="font-semibold text-xs">Export Spreadsheet (CSV)</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    onExportJson();
-                  }}
-                  className="menu-item-action"
-                >
-                  <div className="w-6 h-6 rounded flex items-center justify-center text-blue-400 bg-blue-500/10">
-                    <Download size={15} />
-                  </div>
-                  <span className="font-semibold text-xs">Download PC Backup (JSON)</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    onOpenImportModal();
-                  }}
-                  className="menu-item-action"
-                >
-                  <div className="w-6 h-6 rounded flex items-center justify-center text-amber-400 bg-amber-500/10">
-                    <Upload size={15} />
-                  </div>
-                  <span className="font-semibold text-xs">Restore Database from File</span>
                 </button>
 
                 <div className="menu-divider"></div>

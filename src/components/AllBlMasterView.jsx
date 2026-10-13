@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ArrowRight, Briefcase } from 'lucide-react';
+import { Search, Briefcase } from 'lucide-react';
 
 export const AllBlMasterView = ({ 
   shipments = [], 
@@ -7,6 +7,19 @@ export const AllBlMasterView = ({
   onEditShipment 
 }) => {
   const [search, setSearch] = useState('');
+
+  const handleRowClick = (e, s) => {
+    // If user is selecting text, avoid accidental drawer opening
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      return;
+    }
+    if (onViewDossier) {
+      onViewDossier(s);
+    } else if (onEditShipment) {
+      onEditShipment(s);
+    }
+  };
 
   // Filter across all fields
   const filteredShipments = shipments.filter(s => {
@@ -122,6 +135,8 @@ export const AllBlMasterView = ({
       <div style={{
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
         gap: '12px',
         padding: '10px 16px',
         borderBottom: '1px solid #1e293b',
@@ -160,6 +175,26 @@ export const AllBlMasterView = ({
             onBlur={(e) => e.target.style.borderColor = '#1e293b'}
           />
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ 
+            color: '#64748b', 
+            fontSize: '0.72rem', 
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <span style={{ 
+              display: 'inline-block', 
+              width: '6px', 
+              height: '6px', 
+              borderRadius: '50%', 
+              background: '#38bdf8' 
+            }} />
+            Click any row to open BL details & documents
+          </span>
+        </div>
       </div>
 
       {/* Table fills the remaining height and scrolls internally */}
@@ -197,12 +232,9 @@ export const AllBlMasterView = ({
               <th style={{ ...thStyle, minWidth: '118px' }}>CONTAINER NUMBER(S)</th>
               <th style={{ ...thStyle, minWidth: '80px' }}>NET WEIGHT</th>
               <th style={{ ...thStyle, minWidth: '100px' }}>PORT OF LOADING</th>
-              <th style={{ ...thStyle, minWidth: '80px' }}>ETD (DEPARTURE)</th>
               <th style={{ ...thStyle, minWidth: '80px' }}>ETA (ARRIVAL)</th>
-              <th style={{ ...thStyle, minWidth: '80px' }}>DATE</th>
               <th style={{ ...thStyle, minWidth: '80px' }}>DATE ADDED</th>
               <th style={{ ...thStyle, minWidth: '120px' }}>STATUS</th>
-              <th style={{ ...thStyle, minWidth: '78px', textAlign: 'center' }}>ACTION</th>
             </tr>
           </thead>
 
@@ -210,7 +242,7 @@ export const AllBlMasterView = ({
           <tbody>
             {filteredShipments.length === 0 ? (
               <tr>
-                <td colSpan="16" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
+                <td colSpan="13" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
                   No BL consignments found matching "{search}".
                 </td>
               </tr>
@@ -255,21 +287,22 @@ export const AllBlMasterView = ({
 
                 const netWeightDisplay = s.netWeight || s.grossWeightKg || s.totalPackages || '—';
                 const polDisplay = s.pol || '—';
-                const etdDisplay = s.etd || s.departureDate || '—';
                 const etaDisplay = s.eta || s.ata || '—';
-                const dateDisplay = s.dischargeDate || s.customsDeclarationDate || s.eta || '—';
                 const dateAddedDisplay = (s.createdAt ? s.createdAt.substring(0, 10) : '') || s.dischargeDate || '—';
 
                 return (
                   <tr 
                     key={s.id || s.blNo || idx}
+                    onClick={(e) => handleRowClick(e, s)}
                     style={{
                       borderBottom: '1px solid #1e293b',
                       background: idx % 2 === 0 ? '#0b1120' : '#070c18',
+                      cursor: 'pointer',
                       transition: 'background 120ms'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.background = '#111c35'}
                     onMouseLeave={(e) => e.currentTarget.style.background = idx % 2 === 0 ? '#0b1120' : '#070c18'}
+                    title={`Click to open BL details (${s.blNo || s.cctRefNo || ''})`}
                   >
                     {/* 1. Row Index */}
                     <td style={{ padding: '8px 10px', color: '#64748b', fontWeight: 600 }}>
@@ -299,15 +332,17 @@ export const AllBlMasterView = ({
                       <span style={{ 
                         color: '#fbbf24', 
                         fontWeight: 800, 
-                        fontFamily: 'monospace',
+                        fontFamily: 'monospace', 
                         fontSize: '0.78rem',
-                        letterSpacing: '0.02em'
+                        letterSpacing: '0.02em',
+                        textDecoration: 'underline',
+                        textDecorationColor: 'rgba(251, 191, 36, 0.4)'
                       }}>
                         {s.blNo || 'BL-PENDING'}
                       </span>
                     </td>
 
-                    {/* 3. DEALER NAME in Sky Blue */}
+                    {/* 4. DEALER NAME in Sky Blue */}
                     <td style={{ padding: '8px 10px' }}>
                       {s.dealerName ? (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -326,7 +361,7 @@ export const AllBlMasterView = ({
                       )}
                     </td>
 
-                    {/* 4. LOT NO in Purple Badge */}
+                    {/* 5. LOT NO in Purple Badge */}
                     <td style={{ padding: '8px 10px' }}>
                       {s.lotNo ? (
                         <span style={{ 
@@ -348,17 +383,17 @@ export const AllBlMasterView = ({
                       )}
                     </td>
 
-                    {/* 5. VESSEL */}
+                    {/* 6. VESSEL */}
                     <td style={{ padding: '8px 10px', color: '#cbd5e1', fontWeight: 500 }}>
                       {vesselDisplay}
                     </td>
 
-                    {/* 4. CUSTOMER in Bold White */}
+                    {/* 7. CUSTOMER in Bold White */}
                     <td style={{ padding: '8px 10px', color: '#ffffff', fontWeight: 800, textTransform: 'uppercase' }}>
                       {s.consignee || '—'}
                     </td>
 
-                    {/* 5. CONTAINER NUMBER(S) in Bright Cyan */}
+                    {/* 8. CONTAINER NUMBER(S) in Bright Cyan */}
                     <td style={{ padding: '8px 10px' }}>
                       <span style={{ 
                         color: '#38bdf8', 
@@ -370,37 +405,27 @@ export const AllBlMasterView = ({
                       </span>
                     </td>
 
-                    {/* 6. NET WEIGHT */}
+                    {/* 9. NET WEIGHT */}
                     <td style={{ padding: '8px 10px', color: '#cbd5e1', fontFamily: 'monospace' }}>
                       {netWeightDisplay}
                     </td>
 
-                    {/* 7. PORT OF LOADING */}
+                    {/* 10. PORT OF LOADING */}
                     <td style={{ padding: '8px 10px', color: '#94a3b8' }}>
                       {polDisplay}
                     </td>
 
-                    {/* 8. ETD (DEPARTURE) */}
-                    <td style={{ padding: '8px 10px', color: '#94a3b8', fontFamily: 'monospace' }}>
-                      {etdDisplay}
-                    </td>
-
-                    {/* 9. ETA (ARRIVAL) */}
+                    {/* 11. ETA (ARRIVAL) */}
                     <td style={{ padding: '8px 10px', color: '#94a3b8', fontFamily: 'monospace' }}>
                       {etaDisplay}
                     </td>
 
-                    {/* 10. DATE */}
-                    <td style={{ padding: '8px 10px', color: '#94a3b8', fontFamily: 'monospace' }}>
-                      {dateDisplay}
-                    </td>
-
-                    {/* 11. DATE ADDED */}
+                    {/* 12. DATE ADDED */}
                     <td style={{ padding: '8px 10px', color: '#94a3b8', fontFamily: 'monospace' }}>
                       {dateAddedDisplay}
                     </td>
 
-                    {/* 12. STATUS */}
+                    {/* 13. STATUS */}
                     <td style={{ padding: '8px 10px' }}>
                       <span style={{
                         display: 'inline-block',
@@ -414,39 +439,6 @@ export const AllBlMasterView = ({
                       }}>
                         {rawStatus}
                       </span>
-                    </td>
-
-                    {/* 13. ACTION: Open -> Button */}
-                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => onViewDossier ? onViewDossier(s) : onEditShipment(s)}
-                        style={{
-                          background: '#15203b',
-                          border: '1px solid #334155',
-                          color: '#f8fafc',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          transition: 'all 120ms'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#2563eb';
-                          e.currentTarget.style.borderColor = '#38bdf8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = '#15203b';
-                          e.currentTarget.style.borderColor = '#334155';
-                        }}
-                        title="Open BL Consignment Details"
-                      >
-                        <span>Open</span>
-                        <ArrowRight size={12} />
-                      </button>
                     </td>
                   </tr>
                 );

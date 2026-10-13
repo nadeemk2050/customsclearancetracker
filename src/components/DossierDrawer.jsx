@@ -543,6 +543,17 @@ export const DossierDrawer = ({
           Live dossier - use Download PDF to share or archive it.
         </span>
         <div className="bl-form-actions">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              if (onEdit) onEdit(shipment);
+            }}
+            className="btn btn-primary"
+          >
+            <Edit3 size={15} />
+            <span>Edit Consignment Details</span>
+          </button>
           <button onClick={onClose} className="btn btn-outline">
             Close Dossier
           </button>

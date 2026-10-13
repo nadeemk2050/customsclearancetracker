@@ -221,7 +221,7 @@ export function App() {
   };
 
   const handleEditShipment = (shipment) => {
-    if (!requestActionPassword('edit this Bill of Lading (BL) shipment')) return;
+    setIsDossierOpen(false);
     setEditingShipment(shipment);
     setIsModalOpen(true);
   };
