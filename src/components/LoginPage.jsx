@@ -2,17 +2,14 @@ import React, { useState } from 'react';
 import { 
   Ship, 
   Building2, 
-  Users, 
   Lock, 
   User, 
   Phone, 
   Globe, 
-  ShieldCheck, 
   ArrowRight, 
   AlertCircle, 
   CheckCircle,
   KeyRound,
-  ShieldAlert,
   Mail
 } from 'lucide-react';
 import { 
@@ -110,23 +107,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
     }
   };
 
-  // Quick-fill for Demo Testing
-  const handleQuickDemoAdmin = () => {
-    setAdminLoginData({
-      usernameOrCompany: 'admin',
-      password: '123'
-    });
-    setActiveTab('adminLogin');
-  };
-
-  const handleQuickDemoTeam = () => {
-    setTeamLoginData({
-      companyNameOrId: 'AL MUMTAZ CUSTOMS CLEARING LLC',
-      username: 'tariq',
-      password: '123'
-    });
-    setActiveTab('teamLogin');
-  };
+  // Quick-fill for Developer Access
 
   const handleQuickDemoDeveloper = () => {
     setAdminLoginData({
@@ -167,7 +148,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
           position: 'relative'
         }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
                 width: '48px',
                 height: '48px',
@@ -189,70 +170,10 @@ export const LoginPage = ({ onLoginSuccess }) => {
                 </span>
               </div>
             </div>
-
-            <p style={{ fontSize: '0.875rem', color: '#cbd5e1', lineHeight: 1.6, marginBottom: '2rem' }}>
-              The end-to-end Customs Clearing Agency management system designed to eliminate port terminal storage charges and container line detention.
-            </p>
-
-            <div className="login-features" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ShieldCheck size={18} color="#38bdf8" />
-                <span style={{ fontSize: '0.8rem', color: '#f1f5f9', fontWeight: 600 }}>
-                  Multi-Tenant CHA Company Cloud Isolation
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ShieldAlert size={18} color="#f59e0b" />
-                <span style={{ fontSize: '0.8rem', color: '#f1f5f9', fontWeight: 600 }}>
-                  Automated Dual-Clock Demurrage Prevention
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Users size={18} color="#10b981" />
-                <span style={{ fontSize: '0.8rem', color: '#f1f5f9', fontWeight: 600 }}>
-                  Role-Based Team Member Management
-                </span>
-              </div>
-            </div>
           </div>
 
           <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.12)', paddingTop: '1.5rem', marginTop: '2rem' }}>
-            <span style={{ fontSize: '0.725rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>
-              Quick Demo Access:
-            </span>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={handleQuickDemoAdmin}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: '#ffffff',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
-                Demo Admin (admin / 123)
-              </button>
-              <button
-                type="button"
-                onClick={handleQuickDemoTeam}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: '#ffffff',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
-                Demo Team (tariq / 123)
-              </button>
               <button
                 type="button"
                 onClick={handleQuickDemoDeveloper}
@@ -260,11 +181,16 @@ export const LoginPage = ({ onLoginSuccess }) => {
                   background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(239, 68, 68, 0.25))',
                   border: '1px solid #f59e0b',
                   color: '#fbbf24',
-                  padding: '6px 12px',
+                  padding: '8px 14px',
                   borderRadius: '6px',
                   fontSize: '0.75rem',
                   cursor: 'pointer',
-                  fontWeight: 800
+                  fontWeight: 800,
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
                 }}
               >
                 ⚡ Developer Powers (nadeemalsaham@gmail.com)
