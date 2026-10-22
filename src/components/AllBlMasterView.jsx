@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, CheckCircle2 } from 'lucide-react';
+import { COMPLETED_STATUS, getStepsRemaining, TOTAL_STATUS_STAGES } from '../utils/statusStages';
 
 export const AllBlMasterView = ({ 
   shipments = [], 
@@ -59,6 +60,12 @@ export const AllBlMasterView = ({
     boxShadow: 'inset 0 -2px 0 #1e293b'
   };
 
+  // BLs still moving through the 9 stages = every BL minus the ones already returned
+  const inFieldCount = useMemo(
+    () => filteredShipments.filter((s) => s.customsStatus !== COMPLETED_STATUS).length,
+    [filteredShipments]
+  );
+
   return (
     <div style={{
       background: '#070c18',
@@ -107,6 +114,18 @@ export const AllBlMasterView = ({
               <th style={{ ...thStyle, minWidth: '80px' }}>ETA (ARRIVAL)</th>
               <th style={{ ...thStyle, minWidth: '80px' }}>DATE ADDED</th>
               <th style={{ ...thStyle, minWidth: '120px' }}>STATUS</th>
+              <th style={{ ...thStyle, minWidth: '150px' }}>
+                <span className="steps-th">
+                  <span>STEPS REMAINING</span>
+                  <span
+                    className={'steps-field-badge' + (inFieldCount === 0 ? ' is-empty' : '')}
+                    title={`${filteredShipments.length} BL records minus ${filteredShipments.length - inFieldCount} with Empties Returned`}
+                  >
+                    <span className="steps-field-dot" />
+                    {inFieldCount} in field
+                  </span>
+                </span>
+              </th>
             </tr>
           </thead>
 
@@ -114,7 +133,7 @@ export const AllBlMasterView = ({
           <tbody>
             {filteredShipments.length === 0 ? (
               <tr>
-                <td colSpan="13" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
+                <td colSpan="14" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
                   No BL consignments found matching "{searchQuery}".
                 </td>
               </tr>
@@ -158,6 +177,8 @@ export const AllBlMasterView = ({
                 }
 
                 const netWeightDisplay = s.netWeight || s.grossWeightKg || s.totalPackages || '—';
+
+                const progress = getStepsRemaining(rawStatus);
                 const polDisplay = s.pol || '—';
                 const etaDisplay = s.eta || s.ata || '—';
                 const dateAddedDisplay = (s.createdAt ? s.createdAt.substring(0, 10) : '') || s.dischargeDate || '—';
@@ -311,6 +332,35 @@ export const AllBlMasterView = ({
                       }}>
                         {rawStatus}
                       </span>
+                    </td>
+
+                    {/* 14. STEPS REMAINING */}
+                    <td style={{ padding: '8px 10px' }}>
+                      <div
+                        className="steps-cell"
+                        title={`Phase ${progress.completed} of ${progress.total}${progress.nextStage ? ' — next: ' + progress.nextStage.label : ' — End-to-End Customs & Logistics Progression complete'}`}
+                      >
+                        {progress.isComplete ? (
+                          <span className="steps-chip is-done">
+                            <CheckCircle2 size={11} />
+                            Completed
+                          </span>
+                        ) : (
+                          <span className={'steps-chip' + (progress.remaining <= 3 ? ' is-critical' : '')}>
+                            <strong>{progress.remaining}</strong>
+                            <span className="steps-chip-total">/{progress.total}</span>
+                            <span className="steps-chip-text">
+                              {progress.remaining === 1 ? 'step left' : 'steps left'}
+                            </span>
+                          </span>
+                        )}
+                        <span className="steps-track">
+                          <span
+                            className={'steps-track-fill' + (progress.isComplete ? ' is-done' : '')}
+                            style={{ width: `${progress.percent}%` }}
+                          />
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );

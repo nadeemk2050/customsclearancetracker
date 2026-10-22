@@ -64,6 +64,23 @@ firebase deploy --only storage
 
 ---
 
+## ABC Tracking — Steps Remaining
+
+The consolidated BL table ends with a **Steps Remaining** column driven by the nine-stage progression
+(Pre-Arrival → DO Issued → BOE Filed → Inspection → Duty Paid → OOC Cleared → Port Gate-Out → Delivered →
+Empties Returned).
+
+- The stage a BL has reached counts as done, so Pre-Arrival shows `8/9 steps left` and Delivered `1/9`.
+  `0` remaining renders a green **Completed** chip, and a slim bar under the chip shows the phase progress.
+- Chips turn amber at three or fewer remaining steps so dossiers that are close to port/line free-time
+  expiry stand out.
+- The column header carries an **“N in field”** counter: total BL records in the list minus those already at
+  *Empties Returned*. It follows the current search filter and cloud updates live for every teammate.
+- The maths lives in `getStepsRemaining()` in `src/utils/statusStages.js`, so the table and the dossier
+  stepper can never disagree.
+
+---
+
 ## Sync Engine — How It Works
 
 ### Cross-device real-time sync

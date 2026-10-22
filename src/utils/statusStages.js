@@ -111,6 +111,35 @@ export const STATUS_STAGES = [
 export const getStatusStage = (statusId) =>
   STATUS_STAGES.find((stage) => stage.id === statusId) || null;
 
+export const TOTAL_STATUS_STAGES = STATUS_STAGES.length;
+
+export const COMPLETED_STATUS = 'Empties Returned';
+
+/** 0-based index of the stage a status sits on, or -1 when it is unknown. */
+export const getStatusStageIndex = (status) =>
+  STATUS_STAGES.findIndex((stage) => stage.id === status);
+
+/**
+ * How far a BL still has to travel: the stage it has reached counts as done,
+ * so Pre-Arrival leaves 8 of 9 steps, Delivered leaves 1, Empties Returned 0.
+ */
+export const getStepsRemaining = (status) => {
+  const index = getStatusStageIndex(status);
+  const completed = index < 0 ? 0 : index + 1;
+  const total = TOTAL_STATUS_STAGES;
+  const remaining = Math.max(0, total - completed);
+  const nextStage = STATUS_STAGES[completed] || null;
+
+  return {
+    completed,
+    total,
+    remaining,
+    percent: Math.round((completed / total) * 100),
+    nextStage,
+    isComplete: completed >= total
+  };
+};
+
 /**
  * Build the immutable audit record for one status change.
  * The timestamp and the acting user are always captured.
