@@ -108,7 +108,7 @@ export const AllBlMasterView = ({
               <th style={{ ...thStyle, minWidth: '110px' }}>LOT NO.</th>
               <th style={{ ...thStyle, minWidth: '112px' }}>VESSEL</th>
               <th style={{ ...thStyle, minWidth: '130px' }}>CUSTOMER</th>
-              <th style={{ ...thStyle, minWidth: '118px' }}>CONTAINER NUMBER(S)</th>
+              <th style={{ ...thStyle, minWidth: '104px' }}>CONTAINERS</th>
               <th style={{ ...thStyle, minWidth: '80px' }}>NET WEIGHT</th>
               <th style={{ ...thStyle, minWidth: '100px' }}>PORT OF LOADING</th>
               <th style={{ ...thStyle, minWidth: '80px' }}>ETA (ARRIVAL)</th>
@@ -143,9 +143,9 @@ export const AllBlMasterView = ({
                   .map(c => c.containerNumber || c.containerNo)
                   .filter(Boolean);
 
-                const containerDisplay = containerNumbers.length > 0 
-                  ? containerNumbers.join(', ') 
-                  : '—';
+                // The list shows only how many units the BL carries; the numbers
+                // stay available in the tooltip and in the dossier
+                const containerCount = (s.containers || []).length || containerNumbers.length;
 
                 const vesselDisplay = s.vessel 
                   ? `${s.vessel} ${s.voyage || ''}`.trim() 
@@ -286,15 +286,14 @@ export const AllBlMasterView = ({
                       {s.consignee || '—'}
                     </td>
 
-                    {/* 8. CONTAINER NUMBER(S) in Bright Cyan */}
+                    {/* 8. CONTAINER COUNT */}
                     <td style={{ padding: '8px 10px' }}>
-                      <span style={{ 
-                        color: '#38bdf8', 
-                        fontFamily: 'monospace', 
-                        fontWeight: 700,
-                        fontSize: '0.76rem'
-                      }}>
-                        {containerDisplay}
+                      <span
+                        className={'container-count-chip' + (containerCount === 0 ? ' is-empty' : '')}
+                        title={containerNumbers.length > 0 ? containerNumbers.join(', ') : 'No containers recorded'}
+                      >
+                        <strong>{containerCount}</strong>
+                        <span>{containerCount === 1 ? 'Unit' : 'Units'}</span>
                       </span>
                     </td>
 

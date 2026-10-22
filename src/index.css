@@ -3150,3 +3150,36 @@
 .steps-track-fill.is-done {
   background: linear-gradient(90deg, #059669, #34d399);
 }
+
+/* ABC Tracking: container count chip (numbers live in the tooltip/dossier) */
+.container-count-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 9px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.container-count-chip strong {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: #e0f2fe;
+}
+
+.container-count-chip.is-empty {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+}
+
+.container-count-chip.is-empty strong {
+  color: #cbd5e1;
+}
