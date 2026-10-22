@@ -18,6 +18,9 @@ export const INITIAL_MASTERS = {
     { id: 'sl_11', name: 'Wan Hai Lines', scac: 'WHLC', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 70, contactEmail: 'dxb_cs@wanhai.com', phone: '+971 4 351 1111' }
   ],
 
+  // Vessel names collected while creating BLs (added inline from the BL form)
+  vessels: [],
+
   consignees: [
     { id: 'con_1', name: 'MUMTAZ PLASTIC RECYCLING LLC', address: 'Plot 598-1120, Dubai Industrial City, Phase 2, Warehouse 4, Dubai, UAE', trn: '100294829100003', contactPerson: 'Mr. Mumtaz Ali', phone: '+971 50 123 4567', email: 'operations@mumtazplastic.com', destinationYard: 'Dubai Industrial City Yard, Warehouse 4' },
     { id: 'con_2', name: 'AL-FALAH GENERAL TRADING EST', address: 'Al-Kharj Road, Industrial Area 2, Street 18, Riyadh, Saudi Arabia', trn: '300184920100003', contactPerson: 'Tariq Al-Mansoor', phone: '+966 55 987 6543', email: 'import@alfalahtrading.sa', destinationYard: 'Riyadh Dry Port CFS Warehouse' },
@@ -43,8 +46,7 @@ export const INITIAL_MASTERS = {
     { id: 'prt_8', name: 'Port of Los Angeles (USLAX)', code: 'USLAX', country: 'USA', terminal: 'Pier 400 / APM Terminals', defaultPortFreeDays: 4, defaultPortDailyRate: 120 }
   ],
 
-  cargoDescriptions: [
-    { id: 'crg_1', description: 'POST INDUSTRIAL RECYCLED POLYPROPYLENE GRANULES', defaultHsCode: '3902.10.00', defaultDutyPercent: 5, defaultPackaging: 'Bags / Pallets' },
+  cargoDescriptions: [    { id: 'crg_1', description: 'POST INDUSTRIAL RECYCLED POLYPROPYLENE GRANULES', defaultHsCode: '3902.10.00', defaultDutyPercent: 5, defaultPackaging: 'Bags / Pallets' },
     { id: 'crg_2', description: 'PRECISION AIR CONDITIONING SPARE COMPRESSORS', defaultHsCode: '8414.30.00', defaultDutyPercent: 5, defaultPackaging: 'Wooden Crates' },
     { id: 'crg_3', description: 'NATURAL RUBBER SHEETS TSR20', defaultHsCode: '4001.22.00', defaultDutyPercent: 0, defaultPackaging: 'Bales' },
     { id: 'crg_4', description: 'STAINLESS STEEL FASTENERS & BOLTS', defaultHsCode: '7318.15.00', defaultDutyPercent: 7.5, defaultPackaging: 'Cartons' },

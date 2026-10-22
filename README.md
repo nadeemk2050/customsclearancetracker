@@ -19,6 +19,25 @@ Rules to keep in mind when editing styles:
 
 ---
 
+## Master Data — Add While You Type
+
+Every master-backed field in the BL form (**Dealer Name**, **Shipping Line / Carrier**, **Vessel Name**,
+**Port of Loading**, **Port of Discharge**, **Consignee**, **Shipper**, **Cargo Description** and the per-container
+**Empty Return Depot**) is a searchable master picker (`src/components/MasterPicker.jsx`) rather than a plain text box.
+
+- Clicking the field (or the chevron) opens the master list with a secondary line of context (TRN, SCAC code,
+  HS code, yard, free days…) and a filter as you type.
+- The last row of the panel is **“＋ Add new …”**. It opens a short inline form (name plus only the fields that
+  matter for that collection, defined in `src/config/masterQuickAdd.js`), saves the record to master data, and
+  selects it on the field immediately — no trip to *Manage Masters*.
+- New records flow through `persistMasters()`, so they reach every teammate and device live, and they appear in
+  *Manage Masters* right away (including the **Vessels** tab).
+- Master defaults still auto-fill: the carrier's port/line free days, the POD's storage days, the consignee's
+  delivery address, and the cargo's HS code and packaging.
+- Duplicate names are never created — adding an existing name simply re-selects that record.
+
+---
+
 ## BL Consignment Attachments
 
 The **Documents** step of the BL dossier carries two upload slots — **BL Draft** and **Original BL** (either

@@ -556,6 +556,7 @@ export function App() {
         companyId={activeCompanyId}
         currentUser={session}
         existingShipments={shipments}
+        onSaveMasters={handleSaveMasters}
       />
 
       {/* Manage Masters Modal */}

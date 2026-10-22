@@ -12,6 +12,7 @@ import {
   Anchor, 
   Box, 
   Warehouse,
+  Container,
   CheckCircle,
   Database,
   Briefcase,
@@ -23,6 +24,7 @@ const TABS = [
   { key: 'dealers', label: 'Dealers (Investors/Indentors)', icon: Briefcase },
   { key: 'lots', label: 'Lot Numbers', icon: Layers },
   { key: 'shippingLines', label: 'Shipping Lines', icon: Ship },
+  { key: 'vessels', label: 'Vessels', icon: Container },
   { key: 'consignees', label: 'Consignees (Importers)', icon: Building2 },
   { key: 'shippers', label: 'Shippers (Exporters)', icon: Truck },
   { key: 'ports', label: 'Ports (POL & POD)', icon: Anchor },
@@ -58,6 +60,8 @@ export const ManageMastersModal = ({
       blankItem = { ...blankItem, lotNo: '', dealerName: defaultDealer, description: '', notes: '' };
     } else if (activeTab === 'shippingLines') {
       blankItem = { ...blankItem, name: '', scac: '', defaultPortFreeDays: 5, defaultLineFreeDays: 14, defaultDetentionRate: 80, contactEmail: '', phone: '' };
+    } else if (activeTab === 'vessels') {
+      blankItem = { ...blankItem, name: '', shippingLine: '', voyage: '' };
     } else if (activeTab === 'consignees') {
       blankItem = { ...blankItem, name: '', address: '', trn: '', contactPerson: '', phone: '', email: '', destinationYard: '' };
     } else if (activeTab === 'shippers') {
@@ -530,6 +534,51 @@ export const ManageMastersModal = ({
                 </div>
               )}
 
+              {activeTab === 'vessels' && (
+                <div className="masters-form-grid">
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Vessel Name *
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      className="form-control uppercase"
+                      value={editItem.name || ''}
+                      onChange={(e) => setEditItem({ ...editItem, name: e.target.value.toUpperCase() })}
+                      placeholder="e.g. AL ZUBARA"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Shipping Line
+                    </label>
+                    <select
+                      className="form-control"
+                      value={editItem.shippingLine || ''}
+                      onChange={(e) => setEditItem({ ...editItem, shippingLine: e.target.value })}
+                    >
+                      <option value="">- Select -</option>
+                      {(masters.shippingLines || []).map((line) => (
+                        <option key={line.id || line.name} value={line.name}>{line.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', color: '#334155', marginBottom: '4px' }}>
+                      Usual Voyage Number
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control font-mono"
+                      value={editItem.voyage || ''}
+                      onChange={(e) => setEditItem({ ...editItem, voyage: e.target.value.toUpperCase() })}
+                      placeholder="e.g. 2604E"
+                    />
+                  </div>
+                </div>
+              )}
+
               {activeTab === 'consignees' && (
                 <div className="masters-form-grid">
                   <div className="form-full">
@@ -904,6 +953,12 @@ export const ManageMastersModal = ({
                         <th>Detention Rate</th>
                       </>
                     )}
+                    {activeTab === 'vessels' && (
+                      <>
+                        <th>Shipping Line</th>
+                        <th>Usual Voyage</th>
+                      </>
+                    )}
                     {activeTab === 'consignees' && (
                       <>
                         <th>TRN / Tax #</th>
@@ -992,6 +1047,13 @@ export const ManageMastersModal = ({
                             <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                               ${item.defaultDetentionRate} / day
                             </td>
+                          </>
+                        )}
+
+                        {activeTab === 'vessels' && (
+                          <>
+                            <td>{item.shippingLine || '—'}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)' }}>{item.voyage || '—'}</td>
                           </>
                         )}
 

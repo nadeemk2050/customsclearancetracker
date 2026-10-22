@@ -17,7 +17,10 @@ import {
 } from 'lucide-react';
 import { addDays, getDaysDifference } from '../utils/dateUtils';
 import { BlAttachmentUpload } from './BlAttachmentUpload';
+import { MasterPicker } from './MasterPicker';
+import { MASTER_QUICK_ADD, buildMasterRecord, masterRecordName } from '../config/masterQuickAdd';
 import { BL_ATTACHMENT_SLOTS } from '../services/attachmentService';
+import { saveLocalMasters } from '../services/masterService';
 import { STATUS_STAGES } from '../utils/statusStages';
 
 const DEFAULT_CONTAINER = {
@@ -207,7 +210,8 @@ export const ShipmentModal = ({
   masters = {},
   companyId = 'default',
   currentUser = null,
-  existingShipments = []
+  existingShipments = [],
+  onSaveMasters
 }) => {
   const [formData, setFormData] = useState(DEFAULT_SHIPMENT);
   const [openSections, setOpenSections] = useState({
@@ -220,20 +224,137 @@ export const ShipmentModal = ({
   });
   const [error, setError] = useState('');
 
-  const shippingLines = (masters.shippingLines || []).map((line) => line.name);
-  const consignees = masters.consignees || [];
-  const shippers = (masters.shippers || []).map((item) => item.name);
-  const ports = (masters.ports || []).map((port) => port.name);
-  const cargoItems = masters.cargoDescriptions || [];
-  const dealers = masters.dealers || [];
-  const lots = masters.lots || [];
+  const consignees = useMemo(() => masters.consignees || [], [masters.consignees]);
+  const cargoItems = useMemo(() => masters.cargoDescriptions || [], [masters.cargoDescriptions]);
+  const dealers = useMemo(() => masters.dealers || [], [masters.dealers]);
+  const lots = useMemo(() => masters.lots || [], [masters.lots]);
 
   // Depots are filtered by the selected carrier, falling back to the full list
-  const depotOptions = useMemo(() => {
+  const depotItems = useMemo(() => {
     const all = masters.depots || [];
     const forLine = all.filter((d) => !d.shippingLine || d.shippingLine === formData.shippingLine);
-    return (forLine.length > 0 ? forLine : all).map((depot) => depot.name);
+    return forLine.length > 0 ? forLine : all;
   }, [masters.depots, formData.shippingLine]);
+
+  const depotOptions = useMemo(() => depotItems.map((depot) => depot.name), [depotItems]);
+
+  // Pickers show the master list plus a "+ Add new" entry at the bottom
+  const dealerChoices = useMemo(
+    () => dealers.map((dealer) => ({
+      value: dealer.name,
+      label: dealer.name,
+      meta: [dealer.contactPerson, dealer.trn].filter(Boolean).join(' · '),
+      data: dealer
+    })),
+    [dealers]
+  );
+
+  const lineChoices = useMemo(
+    () => (masters.shippingLines || []).map((line) => ({
+      value: line.name,
+      label: line.name,
+      meta: [line.scac, line.defaultLineFreeDays ? `${line.defaultLineFreeDays} free days` : ''].filter(Boolean).join(' · '),
+      data: line
+    })),
+    [masters.shippingLines]
+  );
+
+  const vesselChoices = useMemo(
+    () => (masters.vessels || []).map((vessel) => ({
+      value: vessel.name,
+      label: vessel.name,
+      meta: [vessel.shippingLine, vessel.voyage].filter(Boolean).join(' · '),
+      data: vessel
+    })),
+    [masters.vessels]
+  );
+
+  const portChoices = useMemo(
+    () => (masters.ports || []).map((port) => ({
+      value: port.name,
+      label: port.name,
+      meta: [port.code, port.country].filter(Boolean).join(' · '),
+      data: port
+    })),
+    [masters.ports]
+  );
+
+  const consigneeChoices = useMemo(
+    () => consignees.map((item) => ({
+      value: item.name,
+      label: item.name,
+      meta: [item.trn, item.address].filter(Boolean).join(' · '),
+      data: item
+    })),
+    [consignees]
+  );
+
+  const shipperChoices = useMemo(
+    () => (masters.shippers || []).map((item) => ({
+      value: item.name,
+      label: item.name,
+      meta: [item.country, item.contactPerson].filter(Boolean).join(' · '),
+      data: item
+    })),
+    [masters.shippers]
+  );
+
+  const cargoChoices = useMemo(
+    () => cargoItems.map((item) => ({
+      value: item.description,
+      label: item.description,
+      meta: [item.defaultHsCode, item.defaultPackaging].filter(Boolean).join(' · '),
+      data: item
+    })),
+    [cargoItems]
+  );
+
+  const depotChoices = useMemo(
+    () => depotItems.map((depot) => ({
+      value: depot.name,
+      label: depot.name,
+      meta: [depot.shippingLine, depot.location].filter(Boolean).join(' · '),
+      data: depot
+    })),
+    [depotItems]
+  );
+
+  const quickAddFields = (category) => {
+    const config = MASTER_QUICK_ADD[category] || {};
+    return (config.fields || []).map((field) => (
+      field.type === 'select' && field.key === 'shippingLine'
+        ? { ...field, options: (masters.shippingLines || []).map((line) => line.name) }
+        : field
+    ));
+  };
+
+  // Creates the master record (instantly shared with the team) and returns it
+  const createMasterRecord = async (category, draft) => {
+    const current = masters[category] || [];
+    const name = draft.name.trim();
+
+    const duplicate = current.find(
+      (item) => masterRecordName(category, item).trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) return { ok: true, record: duplicate, existed: true };
+
+    const record = buildMasterRecord(category, { ...draft, name });
+    if (category === 'depots' && !record.shippingLine && formData.shippingLine) {
+      record.shippingLine = formData.shippingLine;
+    }
+
+    const updatedMasters = { ...masters, [category]: [...current, record] };
+
+    try {
+      if (onSaveMasters) await onSaveMasters(updatedMasters);
+      else saveLocalMasters(updatedMasters, companyId);
+    } catch (err) {
+      console.error('Failed saving master record:', err);
+      return { ok: false, message: 'Could not save to master data. Please try again.' };
+    }
+
+    return { ok: true, record };
+  };
 
   useEffect(() => {
     if (shipmentToEdit) {
@@ -320,10 +441,10 @@ export const ShipmentModal = ({
   };
 
   // Master auto-fills
-  const handleDealerSelect = (dealerName) => {
+  const handleDealerSelect = (dealerName, dealer) => {
     setFormData((prev) => ({
       ...prev,
-      dealerName
+      dealerName: dealer?.name || dealerName
     }));
   };
 
@@ -337,8 +458,8 @@ export const ShipmentModal = ({
     }));
   };
 
-  const handleShippingLineSelect = (lineName) => {
-    const matched = (masters.shippingLines || []).find((line) => line.name === lineName);
+  const handleShippingLineSelect = (lineName, line) => {
+    const matched = line || (masters.shippingLines || []).find((item) => item.name === lineName);
     setFormData((prev) => ({
       ...prev,
       shippingLine: lineName,
@@ -347,8 +468,16 @@ export const ShipmentModal = ({
     }));
   };
 
-  const handleConsigneeSelect = (name) => {
-    const matched = consignees.find((item) => item.name.toLowerCase() === name.toLowerCase());
+  const handleVesselSelect = (vesselName, vessel) => {
+    setFormData((prev) => ({
+      ...prev,
+      vessel: vesselName,
+      voyage: prev.voyage || vessel?.voyage || ''
+    }));
+  };
+
+  const handleConsigneeSelect = (name, consignee) => {
+    const matched = consignee || consignees.find((item) => item.name.toLowerCase() === name.toLowerCase());
     setFormData((prev) => ({
       ...prev,
       consignee: name,
@@ -356,8 +485,8 @@ export const ShipmentModal = ({
     }));
   };
 
-  const handlePodSelect = (podName) => {
-    const matched = (masters.ports || []).find((port) => port.name.toLowerCase() === podName.toLowerCase());
+  const handlePodSelect = (podName, port) => {
+    const matched = port || (masters.ports || []).find((item) => item.name.toLowerCase() === podName.toLowerCase());
     setFormData((prev) => ({
       ...prev,
       pod: podName,
@@ -365,8 +494,13 @@ export const ShipmentModal = ({
     }));
   };
 
-  const handleCargoSelect = (cargoDesc) => {
-    const matched = cargoItems.find((item) => item.description.toLowerCase() === cargoDesc.toLowerCase());
+  // POL only ever records the port name
+  const handlePolSelect = (polName) => {
+    setFormData((prev) => ({ ...prev, pol: polName }));
+  };
+
+  const handleCargoSelect = (cargoDesc, cargo) => {
+    const matched = cargo || cargoItems.find((item) => item.description.toLowerCase() === cargoDesc.toLowerCase());
     setFormData((prev) => ({
       ...prev,
       cargoDescription: cargoDesc,
@@ -524,7 +658,6 @@ export const ShipmentModal = ({
   return (
     <div className="bl-form-page" role="dialog" aria-modal="true" aria-label="BL consignment details">
       {/* Master data powering the dropdowns (typing a new value stays possible) */}
-      <datalist id="master-dealers">{dealers.map((d) => <option key={d.id || d.name} value={d.name} />)}</datalist>
       <datalist id="master-lots">
         {lots.map((l) => (
           <option key={l.id || l.lotNo} value={l.lotNo}>
@@ -532,12 +665,6 @@ export const ShipmentModal = ({
           </option>
         ))}
       </datalist>
-      <datalist id="master-shipping-lines">{shippingLines.map((name) => <option key={name} value={name} />)}</datalist>
-      <datalist id="master-consignees">{consignees.map((item) => <option key={item.id || item.name} value={item.name} />)}</datalist>
-      <datalist id="master-shippers">{shippers.map((name) => <option key={name} value={name} />)}</datalist>
-      <datalist id="master-ports">{ports.map((name) => <option key={name} value={name} />)}</datalist>
-      <datalist id="master-cargo">{cargoItems.map((item) => <option key={item.id || item.description} value={item.description} />)}</datalist>
-      <datalist id="master-depots">{depotOptions.map((name) => <option key={name} value={name} />)}</datalist>
 
       <header className="bl-form-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
@@ -640,12 +767,21 @@ export const ShipmentModal = ({
                 onChange={(value) => handleInputChange('blNo', value.toUpperCase())}
                 placeholder="e.g. HLCUTOR260620111"
               />
-              <Field
+              <MasterPicker
                 id="bl-dealer"
-                listId="master-dealers"
                 label="Dealer Name (Investor / Indentor)"
                 value={formData.dealerName}
                 onChange={handleDealerSelect}
+                options={dealerChoices}
+                panelTitle="Dealers (Investors / Indentors)"
+                addLabel={MASTER_QUICK_ADD.dealers.label}
+                addFields={quickAddFields('dealers')}
+                onSubmitNew={async (draft) => {
+                  const result = await createMasterRecord('dealers', draft);
+                  if (!result.ok) return result;
+                  handleDealerSelect(masterRecordName('dealers', result.record), result.record);
+                  return result;
+                }}
                 placeholder="Select master dealer or type..."
                 hint="Main investor/indentor financing or owning the shipment"
               />
@@ -659,22 +795,41 @@ export const ShipmentModal = ({
                 placeholder="e.g. LOT-2026-001"
                 hint="Consignment lot allocation (bound to dealer)"
               />
-              <Field
+              <MasterPicker
                 id="bl-carrier"
-                listId="master-shipping-lines"
                 label="Shipping Line / Carrier"
                 required
                 value={formData.shippingLine}
                 onChange={handleShippingLineSelect}
+                options={lineChoices}
+                panelTitle="Shipping Lines / Carriers"
+                addLabel={MASTER_QUICK_ADD.shippingLines.label}
+                addFields={quickAddFields('shippingLines')}
+                onSubmitNew={async (draft) => {
+                  const result = await createMasterRecord('shippingLines', draft);
+                  if (!result.ok) return result;
+                  handleShippingLineSelect(result.record.name, result.record);
+                  return result;
+                }}
                 placeholder="Select carrier or type..."
                 hint="Picking a master carrier loads its default free days"
               />
-              <Field
+              <MasterPicker
                 id="bl-vessel"
                 label="Vessel Name"
                 value={formData.vessel}
-                onChange={(value) => handleInputChange('vessel', value)}
-                placeholder="e.g. AL ZUBARA"
+                onChange={handleVesselSelect}
+                options={vesselChoices}
+                panelTitle="Vessels"
+                addLabel={MASTER_QUICK_ADD.vessels.label}
+                addFields={quickAddFields('vessels')}
+                onSubmitNew={async (draft) => {
+                  const result = await createMasterRecord('vessels', draft);
+                  if (!result.ok) return result;
+                  handleVesselSelect(result.record.name, result.record);
+                  return result;
+                }}
+                placeholder="Select vessel or type..."
               />
               <Field
                 id="bl-voyage"
@@ -694,48 +849,93 @@ export const ShipmentModal = ({
             meta={formData.pod || ''}
           >
             <div className="bl-form-grid">
-              <Field
+              <MasterPicker
                 id="bl-pol"
-                listId="master-ports"
                 label="Port of Loading (POL)"
                 value={formData.pol}
-                onChange={(value) => handleInputChange('pol', value)}
-                placeholder="e.g. Hamburg Port (DEHAM)"
+                onChange={handlePolSelect}
+                options={portChoices}
+                panelTitle="Ports (POL / POD)"
+                addLabel={MASTER_QUICK_ADD.ports.label}
+                addFields={quickAddFields('ports')}
+                onSubmitNew={async (draft) => {
+                  const result = await createMasterRecord('ports', draft);
+                  if (!result.ok) return result;
+                  handlePolSelect(result.record.name);
+                  return result;
+                }}
+                placeholder="Select port or type..."
               />
-              <Field
+              <MasterPicker
                 id="bl-pod"
-                listId="master-ports"
                 label="Port of Discharge (POD)"
                 required
                 value={formData.pod}
                 onChange={handlePodSelect}
-                placeholder="e.g. Jebel Ali Port (AEJEA)"
+                options={portChoices}
+                panelTitle="Ports (POL / POD)"
+                addLabel={MASTER_QUICK_ADD.ports.label}
+                addFields={quickAddFields('ports')}
+                onSubmitNew={async (draft) => {
+                  const result = await createMasterRecord('ports', draft);
+                  if (!result.ok) return result;
+                  handlePodSelect(result.record.name, result.record);
+                  return result;
+                }}
+                placeholder="Select port or type..."
                 hint="Picking a master port loads its default storage days"
               />
-              <Field
+              <MasterPicker
                 id="bl-consignee"
-                listId="master-consignees"
                 label="Consignee (Importer)"
                 required
                 value={formData.consignee}
                 onChange={handleConsigneeSelect}
+                options={consigneeChoices}
+                panelTitle="Consignees (Importers)"
+                addLabel={MASTER_QUICK_ADD.consignees.label}
+                addFields={quickAddFields('consignees')}
+                onSubmitNew={async (draft) => {
+                  const result = await createMasterRecord('consignees', draft);
+                  if (!result.ok) return result;
+                  handleConsigneeSelect(result.record.name, result.record);
+                  return result;
+                }}
                 placeholder="Select master consignee or type..."
                 hint={formData.finalDestination ? 'Delivery address: ' + formData.finalDestination : 'Auto-fills the delivery address'}
               />
-              <Field
+              <MasterPicker
                 id="bl-shipper"
-                listId="master-shippers"
                 label="Shipper (Exporter / Supplier)"
                 value={formData.shipper}
                 onChange={(value) => handleInputChange('shipper', value)}
+                options={shipperChoices}
+                panelTitle="Shippers (Exporters / Suppliers)"
+                addLabel={MASTER_QUICK_ADD.shippers.label}
+                addFields={quickAddFields('shippers')}
+                onSubmitNew={async (draft) => {
+                  const result = await createMasterRecord('shippers', draft);
+                  if (!result.ok) return result;
+                  handleInputChange('shipper', result.record.name);
+                  return result;
+                }}
                 placeholder="Select master shipper or type..."
               />
-              <Field
+              <MasterPicker
                 id="bl-cargo"
-                listId="master-cargo"
                 label="Cargo Description"
                 value={formData.cargoDescription}
                 onChange={handleCargoSelect}
+                options={cargoChoices}
+                panelTitle="Cargo Descriptions & HS Codes"
+                addLabel={MASTER_QUICK_ADD.cargoDescriptions.label}
+                addFields={quickAddFields('cargoDescriptions')}
+                onSubmitNew={async (draft) => {
+                  const result = await createMasterRecord('cargoDescriptions', draft);
+                  if (!result.ok) return result;
+                  handleCargoSelect(masterRecordName('cargoDescriptions', result.record), result.record);
+                  return result;
+                }}
                 placeholder="Select from master cargo or type..."
                 hint={formData.hsCode ? 'HS Code: ' + formData.hsCode : 'Auto-fills HS code and packaging'}
               />
@@ -918,12 +1118,21 @@ export const ShipmentModal = ({
                       value={container.gateOutDate}
                       onChange={(value) => handleContainerChange(index, 'gateOutDate', value)}
                     />
-                    <Field
+                    <MasterPicker
                       id={'cont-depot-' + index}
-                      listId="master-depots"
                       label="Empty Return Depot"
                       value={container.emptyReturnDepot}
                       onChange={(value) => handleContainerChange(index, 'emptyReturnDepot', value)}
+                      options={depotChoices}
+                      panelTitle="Empty Return Depots"
+                      addLabel={MASTER_QUICK_ADD.depots.label}
+                      addFields={quickAddFields('depots')}
+                      onSubmitNew={async (draft) => {
+                        const result = await createMasterRecord('depots', draft);
+                        if (!result.ok) return result;
+                        handleContainerChange(index, 'emptyReturnDepot', result.record.name);
+                        return result;
+                      }}
                       placeholder="Select master depot or type..."
                     />
                     <Field
