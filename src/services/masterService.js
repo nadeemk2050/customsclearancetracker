@@ -1,7 +1,7 @@
 // Master Data Management Service (Offline-First Architecture)
 // Shipping Lines, Consignees, Shippers, Ports, Cargo, Depots
 
-import { db, doc, getDoc, setDoc } from '../firebase/config';
+import { db, doc, setDoc, onSnapshot } from '../firebase/config';
 
 export const INITIAL_MASTERS = {
   shippingLines: [
@@ -133,31 +133,55 @@ export const saveLocalMasters = (masters, companyId = 'cha_al_mumtaz') => {
   }
 };
 
-// 3. OFFLINE-FIRST: Subscribe to Masters (loads local first, then pulls single remote snapshot)
+// 3. OFFLINE-FIRST: Subscribe to Masters — local first, then live cloud updates
+// Any master added or edited by one team member reaches every teammate instantly.
 export const subscribeToMasters = (companyId = 'cha_al_mumtaz', onData) => {
   // Emit local instantly
   const local = getLocalMasters(companyId);
   onData(local);
 
-  // Background single read from Firestore (low quota consumption)
-  const docRef = doc(db, 'cct_shipments', `masters_${companyId}`);
-  getDoc(docRef).then((docSnap) => {
-    if (docSnap.exists()) {
-      const remoteData = docSnap.data();
-      const merged = { 
-        ...INITIAL_MASTERS, 
-        ...remoteData,
-        dealers: remoteData?.dealers && remoteData.dealers.length > 0 ? remoteData.dealers : (local.dealers || INITIAL_MASTERS.dealers),
-        lots: remoteData?.lots && remoteData.lots.length > 0 ? remoteData.lots : (local.lots || INITIAL_MASTERS.lots)
-      };
-      saveLocalMasters(merged, companyId);
-      onData(merged);
-    }
-  }).catch(() => {
-    // Offline mode is completely supported
-  });
+  let unsubscribe = () => {};
 
-  return () => {};
+  try {
+    const docRef = doc(db, 'cct_shipments', `masters_${companyId}`);
+    unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (!docSnap.exists()) {
+          // First device for this company: publish the starting master data
+          setDoc(docRef, { ...local, updatedAt: new Date().toISOString() }).catch(() => {});
+          return;
+        }
+
+        const remoteData = docSnap.data();
+        const merged = {
+          ...INITIAL_MASTERS,
+          ...remoteData,
+          dealers: remoteData?.dealers && remoteData.dealers.length > 0
+            ? remoteData.dealers
+            : (local.dealers || INITIAL_MASTERS.dealers),
+          lots: remoteData?.lots && remoteData.lots.length > 0
+            ? remoteData.lots
+            : (local.lots || INITIAL_MASTERS.lots)
+        };
+        saveLocalMasters(merged, companyId);
+        onData(merged);
+      },
+      (err) => {
+        console.warn('[Cloud Sync] Masters listener:', err?.message || err);
+      }
+    );
+  } catch (err) {
+    console.warn('[Cloud Sync] Masters listener unavailable:', err?.message || err);
+  }
+
+  return () => {
+    try {
+      unsubscribe();
+    } catch {
+      // ignore
+    }
+  };
 };
 
 // 4. OFFLINE-FIRST: Persist Masters (Writes locally first, then single cloud write)

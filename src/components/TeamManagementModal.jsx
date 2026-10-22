@@ -18,7 +18,9 @@ import {
 import { 
   getCompanyTeamMembers, 
   saveCompanyTeamMember, 
-  removeCompanyTeamMember 
+  removeCompanyTeamMember,
+  refreshCompaniesFromCloud,
+  subscribeCloudCompanies
 } from '../services/authService';
 import { requestActionPassword } from '../utils/securityGate';
 
@@ -40,14 +42,23 @@ export const TeamManagementModal = ({ isOpen, onClose, currentSession }) => {
   const companyId = currentSession?.companyId || 'cha_al_mumtaz';
   const companyName = currentSession?.companyName || 'AL MUMTAZ CUSTOMS CLEARING LLC';
 
-  // Load team members whenever modal opens
+  // Load team members whenever modal opens, then keep them live across devices
   useEffect(() => {
-    if (isOpen && companyId) {
-      const list = getCompanyTeamMembers(companyId, companyName);
-      setTeamMembers(list);
-      setEditingId(null);
-      resetForm();
-    }
+    if (!isOpen || !companyId) return;
+
+    const load = () => setTeamMembers(getCompanyTeamMembers(companyId, companyName));
+    load();
+    setEditingId(null);
+    resetForm();
+
+    // Pull the latest company directory, then follow it live so a teammate's change
+    // (add / edit / remove) appears here without reopening the modal.
+    refreshCompaniesFromCloud().then(load).catch(() => {});
+    const unsubscribe = subscribeCloudCompanies(load);
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [isOpen, companyId, companyName]);
 
   const resetForm = () => {

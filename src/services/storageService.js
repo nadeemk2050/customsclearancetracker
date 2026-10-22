@@ -4,11 +4,9 @@
 
 import { 
   db, 
-  collection, 
   doc, 
   getDoc, 
   setDoc, 
-  deleteDoc, 
   onSnapshot 
 } from '../firebase/config';
 
@@ -275,15 +273,76 @@ export const getLocalShipments = (companyId = 'cha_al_mumtaz') => {
 };
 
 // 2. OFFLINE-FIRST: Write instantly to local PC/Browser storage
-export const saveLocalShipments = (shipments, companyId = 'cha_al_mumtaz') => {
+// `markPending: false` is used when applying a remote snapshot, so a pull does not
+// look like unsynced local work.
+export const saveLocalShipments = (shipments, companyId = 'cha_al_mumtaz', options = {}) => {
   try {
     const key = getCompanyStorageKey(companyId);
     localStorage.setItem(key, JSON.stringify(shipments));
-    // Record that we have un-synced or pending changes
-    setLocalSyncStatus(companyId, { pending: true, lastLocalSave: new Date().toISOString() });
+    if (options.markPending !== false) {
+      // Record that we have un-synced or pending changes
+      setLocalSyncStatus(companyId, { pending: true, lastLocalSave: new Date().toISOString() });
+    }
   } catch (err) {
     console.error('Failed writing to local PC storage:', err);
   }
+};
+
+const toTimestamp = (value) => {
+  const parsed = Date.parse(value || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+/**
+ * Merge a local shipment list with the cloud snapshot, last-write-wins per record.
+ * - Records in the cloud are kept, unless the local copy is newer (pending edit).
+ * - Local records missing from the cloud are kept only when they are newer than the
+ *   snapshot and were not deleted elsewhere, which preserves a brand-new local BL
+ *   without resurrecting deleted ones.
+ * - An empty cloud snapshot never discards local records unless it carries tombstones.
+ */
+export const mergeShipmentLists = (local = [], remote = [], remoteUpdatedAt = null, deletedIds = []) => {
+  const localList = Array.isArray(local) ? local : [];
+  const remoteList = Array.isArray(remote) ? remote : [];
+  const tombstones = new Map(
+    (Array.isArray(deletedIds) ? deletedIds : []).map((entry) => [entry?.id, toTimestamp(entry?.deletedAt)])
+  );
+
+  // Drop local copies of records that were deleted elsewhere more recently
+  const aliveLocal = localList.filter((record) => {
+    const deletedAt = tombstones.get(record?.id);
+    if (deletedAt === undefined) return true;
+    return toTimestamp(record?.updatedAt) > deletedAt;
+  });
+
+  if (remoteList.length === 0) {
+    // An empty snapshot only clears local data when it carries deletions
+    return tombstones.size > 0 ? [] : aliveLocal;
+  }
+  if (aliveLocal.length === 0) return [...remoteList];
+
+  const remoteTs = toTimestamp(remoteUpdatedAt);
+  const localById = new Map(aliveLocal.filter((r) => r?.id).map((r) => [r.id, r]));
+  const merged = [];
+  const seen = new Set();
+
+  remoteList.forEach((remoteRecord) => {
+    if (!remoteRecord?.id) return;
+    const localRecord = localById.get(remoteRecord.id);
+    if (localRecord && toTimestamp(localRecord.updatedAt) > toTimestamp(remoteRecord.updatedAt)) {
+      merged.push(localRecord);
+    } else {
+      merged.push(remoteRecord);
+    }
+    seen.add(remoteRecord.id);
+  });
+
+  aliveLocal.forEach((localRecord) => {
+    if (!localRecord?.id || seen.has(localRecord.id)) return;
+    if (toTimestamp(localRecord.updatedAt) > remoteTs) merged.push(localRecord);
+  });
+
+  return merged;
 };
 
 // Helper for local sync status
@@ -307,14 +366,14 @@ export const setLocalSyncStatus = (companyId, status) => {
 };
 
 // 3. CLOUD BATCH SYNC: Debounced vault snapshot write (Prevents unlimited reads/writes)
-export const scheduleCloudVaultSync = (companyId, shipments) => {
+export const scheduleCloudVaultSync = (companyId, shipments, options = {}) => {
   if (syncDebounceTimer) {
     clearTimeout(syncDebounceTimer);
   }
 
   syncDebounceTimer = setTimeout(async () => {
     try {
-      await pushCompanyVaultToCloud(companyId, shipments);
+      await pushCompanyVaultToCloud(companyId, shipments, options);
     } catch (err) {
       console.warn('Background cloud vault sync note:', err);
     }
@@ -322,25 +381,58 @@ export const scheduleCloudVaultSync = (companyId, shipments) => {
 };
 
 // Direct manual or automatic push of company dataset to Firestore (1 single write!)
-export const pushCompanyVaultToCloud = async (companyId, shipments) => {
-  if (!companyId) return;
+export const pushCompanyVaultToCloud = async (companyId, shipments, options = {}) => {
+  if (!companyId) return { pushed: false, reason: 'no-company' };
+  const list = Array.isArray(shipments) ? shipments : [];
+
   try {
     const docRef = doc(db, 'cct_shipments', `vault_${companyId}`);
+    const snap = await getDoc(docRef);
+    const remote = snap.exists() && Array.isArray(snap.data()?.shipments) ? snap.data().shipments : [];
+    const remoteDeleted = snap.exists() && Array.isArray(snap.data()?.deletedIds) ? snap.data().deletedIds : [];
+
+    // SAFETY GUARD: an empty local list must never erase records that exist in the
+    // cloud (for example a freshly installed device that has not pulled yet).
+    if (list.length === 0 && !options.allowEmpty) {
+      if (remote.length > 0) {
+        saveLocalShipments(remote, companyId, { markPending: false });
+        console.warn(
+          `[Cloud Sync] Blocked writing an empty list over ${remote.length} cloud record(s) for ${companyId}.`
+        );
+        return { pushed: false, reason: 'empty-guard', remote };
+      }
+    }
+
+    // Merge tombstones so a deletion made here is not undone by another device
+    const tombstones = new Map(remoteDeleted.map((entry) => [entry.id, entry]));
+    (options.deletedIds || []).forEach((entry) => {
+      if (entry?.id) tombstones.set(entry.id, entry);
+    });
+
+    // Keep the tombstone list small: drop entries older than 90 days
+    const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    const deletedIds = Array.from(tombstones.values()).filter(
+      (entry) => toTimestamp(entry.deletedAt) >= cutoff
+    );
+
     const payload = {
       companyId,
-      shipmentsCount: shipments.length,
-      shipments,
+      shipmentsCount: list.length,
+      shipments: list,
+      deletedIds,
       updatedAt: new Date().toISOString()
     };
     await setDoc(docRef, payload);
-    setLocalSyncStatus(companyId, { pending: false, lastSyncedAt: new Date().toISOString() });
-    console.log(`[Offline-First Cloud Sync] Vault updated for ${companyId} (${shipments.length} records).`);
-  } catch {
-    // Graceful offline-first fallback
+    setLocalSyncStatus(companyId, { pending: false, lastSyncedAt: payload.updatedAt });
+    console.log(`[Offline-First Cloud Sync] Vault updated for ${companyId} (${list.length} records).`);
+    return { pushed: true, count: list.length };
+  } catch (err) {
+    console.warn('[Cloud Sync] Vault push failed:', err?.message || err);
+    return { pushed: false, reason: 'error', error: err };
   }
 };
 
-// Pull company dataset from Firestore (1 single read on launch)
+// Pull company dataset from Firestore (merge, never destructive)
 export const pullCompanyVaultFromCloud = async (companyId) => {
   if (!companyId) return null;
   try {
@@ -348,34 +440,77 @@ export const pullCompanyVaultFromCloud = async (companyId) => {
     const snap = await getDoc(docRef);
     if (snap.exists()) {
       const data = snap.data();
-      if (Array.isArray(data.shipments) && data.shipments.length > 0) {
-        saveLocalShipments(data.shipments, companyId);
-        setLocalSyncStatus(companyId, { pending: false, lastSyncedAt: data.updatedAt || new Date().toISOString() });
-        return data.shipments;
-      }
+      const remote = Array.isArray(data?.shipments) ? data.shipments : [];
+      const merged = mergeShipmentLists(
+        getLocalShipments(companyId),
+        remote,
+        data?.updatedAt,
+        data?.deletedIds
+      );
+      saveLocalShipments(merged, companyId, { markPending: false });
+      setLocalSyncStatus(companyId, { pending: false, lastSyncedAt: data?.updatedAt || new Date().toISOString() });
+      return merged;
     }
-  } catch {
-    // Graceful offline-first fallback
+  } catch (err) {
+    console.warn('[Cloud Sync] Vault pull failed:', err?.message || err);
   }
   return null;
 };
 
-// 4. OFFLINE-FIRST: Subscribe to shipments with immediate local delivery & background cloud sync
+// 4. OFFLINE-FIRST: Subscribe to shipments — local first, then live cloud updates
+// Every device logged into the same company receives changes in real time.
 export const subscribeToShipments = (companyId = 'cha_al_mumtaz', onData, onSyncStatusChange) => {
   // 1. Immediately emit local data from PC/Browser storage (Instant 0ms load)
   const localData = getLocalShipments(companyId);
   onData(localData);
 
-  // 2. Perform a single low-impact cloud fetch in background to check for remote team updates
-  pullCompanyVaultFromCloud(companyId).then((remoteData) => {
-    if (remoteData && remoteData.length > 0) {
-      onData(remoteData);
-      if (onSyncStatusChange) onSyncStatusChange({ pending: false, lastSyncedAt: new Date().toISOString() });
-    }
-  }).catch(() => {});
+  let unsubscribe = () => {};
+
+  // 2. Live listener: pushes and pulls for every team member of this company
+  try {
+    const docRef = doc(db, 'cct_shipments', `vault_${companyId}`);
+    unsubscribe = onSnapshot(
+      docRef,
+      (snap) => {
+        if (!snap.exists()) {
+          // First device for this company: publish whatever we already hold
+          if (localData.length > 0) pushCompanyVaultToCloud(companyId, localData);
+          return;
+        }
+
+        const data = snap.data();
+        const remote = Array.isArray(data?.shipments) ? data.shipments : [];
+        const deletedIds = Array.isArray(data?.deletedIds) ? data.deletedIds : [];
+        const merged = mergeShipmentLists(getLocalShipments(companyId), remote, data?.updatedAt, deletedIds);
+
+        saveLocalShipments(merged, companyId, { markPending: false });
+        onData(merged);
+        setLocalSyncStatus(companyId, { pending: false, lastSyncedAt: data?.updatedAt || new Date().toISOString() });
+        if (onSyncStatusChange) {
+          onSyncStatusChange({ pending: false, lastSyncedAt: data?.updatedAt || new Date().toISOString() });
+        }
+
+        // If the cloud copy is empty without any deletion record but this device holds
+        // records, republish them (protects against an accidental empty overwrite).
+        if (remote.length === 0 && merged.length > 0 && deletedIds.length === 0) {
+          pushCompanyVaultToCloud(companyId, merged);
+        }
+      },
+      (err) => {
+        console.warn('[Cloud Sync] Shipments listener:', err?.message || err);
+      }
+    );
+  } catch (err) {
+    console.warn('[Cloud Sync] Shipments listener unavailable:', err?.message || err);
+  }
 
   // Cleanup
   return () => {
+    try {
+      unsubscribe();
+    } catch {
+      // ignore
+    }
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
   };
 };
@@ -408,7 +543,12 @@ export const persistShipment = async (shipment, existingList, companyId = 'cha_a
 export const removeShipment = async (id, existingList, companyId = 'cha_al_mumtaz') => {
   const updatedList = existingList.filter(item => item.id !== id);
   saveLocalShipments(updatedList, companyId);
-  scheduleCloudVaultSync(companyId, updatedList);
+  // Deleting the last record is an intentional action, so an empty list is allowed.
+  // The tombstone tells every other device that this delete is deliberate.
+  scheduleCloudVaultSync(companyId, updatedList, {
+    allowEmpty: true,
+    deletedIds: [{ id, deletedAt: new Date().toISOString() }]
+  });
   return updatedList;
 };
 

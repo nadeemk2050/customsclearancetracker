@@ -47,6 +47,22 @@ firebase deploy --only storage
 
 ## Sync Engine — How It Works
 
+### Cross-device real-time sync
+
+Every device logged into the same CHA company stays in step:
+
+- `vault_<companyId>` (shipments) and `masters_<companyId>` (master data) are watched with a
+  Firestore `onSnapshot` listener, so a BL added, edited or deleted on one computer appears on
+  every teammate's screen within a second or two.
+- Incoming snapshots are **merged per record with last-write-wins on `updatedAt`**, so an
+  unsynced local edit is never silently discarded.
+- Deletions are explicit: `removeShipment()` writes a **tombstone** (`deletedIds`) so other
+  devices remove the record instead of resurrecting it.
+- Safety guard: an empty local list can never overwrite a non-empty cloud vault (protects a
+  freshly installed device), and an empty cloud snapshot without tombstones is republished
+  from any device that still holds the records.
+- Team member changes propagate through the `companies_directory` live listener.
+
 ### Architecture Components
 - **Local DB (`src/localDB.js`)**: Polymorphic single-table store (`offline_records`) and transactional outbox (`sync_queue`), isolated per tenant (`myapp_tenant_{tenantId}`).
 - **Local API (`src/dbApi.js`)**: Firestore-shaped optimistic API (`addDoc`, `setDoc`, `updateDoc`, `deleteDoc`, `onSnapshot`). Writes return immediately without waiting for the network.
