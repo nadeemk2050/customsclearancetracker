@@ -13,9 +13,11 @@ import { ExportImportModal } from './components/ExportImportModal';
 import { StatusUpdateModal } from './components/StatusUpdateModal';
 import { LossPreventionRadarView } from './components/LossPreventionRadarView';
 import { AllBlMasterView } from './components/AllBlMasterView';
+import { LogHistoryView } from './components/LogHistoryView';
 import { ManageMastersModal } from './components/ManageMastersModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { WorkLaterView } from './components/WorkLaterView';
+import { recordLogEntry, calculateShipmentDiff } from './services/logService';
 import { 
   subscribeToShipments, 
   persistShipment, 
@@ -285,6 +287,61 @@ export function App() {
 
     // Hold the new status back until the audit questionnaire has been answered
     const payload = statusChanged ? { ...formData, customsStatus: previous.customsStatus } : formData;
+
+    const staffName = session?.displayName || session?.username || 'Staff User';
+    const staffRole = session?.role || 'Customs Clearance Specialist';
+
+    if (!previous) {
+      // 1. CREATE CRUD ACTION
+      payload.createdAt = payload.createdAt || new Date().toISOString();
+      payload.createdBy = staffName;
+      payload.timesModified = 0;
+      await recordLogEntry(activeCompanyId, {
+        action: 'CREATE',
+        blNo: payload.blNo || '—',
+        cctRefNo: payload.cctRefNo || payload.id || '—',
+        dealerName: payload.dealerName || '—',
+        lotNo: payload.lotNo || '—',
+        staffName,
+        staffRole,
+        dateAdded: payload.createdAt.substring(0, 10),
+        timesModified: 0,
+        summary: `New BL consignment voucher created with ${(payload.containers || []).length} Unit container(s)`,
+        changes: [
+          { field: 'blNo', label: 'BL Number', oldVal: '—', newVal: payload.blNo || '—' },
+          { field: 'cctRefNo', label: 'CCT Ref No.', oldVal: '—', newVal: payload.cctRefNo || payload.id || '—' },
+          { field: 'dealerName', label: 'Dealer Name', oldVal: '—', newVal: payload.dealerName || '—' },
+          { field: 'lotNo', label: 'Lot No.', oldVal: '—', newVal: payload.lotNo || '—' },
+          { field: 'consignee', label: 'Customer', oldVal: '—', newVal: payload.consignee || '—' },
+          { field: 'customsStatus', label: 'Status', oldVal: '—', newVal: payload.customsStatus || 'Pre-Arrival' }
+        ],
+        snapshot: payload
+      });
+    } else {
+      // 2. UPDATE CRUD ACTION
+      const diff = calculateShipmentDiff(previous, payload);
+      if (diff.length > 0) {
+        const modCount = (previous.timesModified || 0) + 1;
+        payload.timesModified = modCount;
+        payload.updatedAt = new Date().toISOString();
+        payload.updatedBy = staffName;
+        await recordLogEntry(activeCompanyId, {
+          action: 'UPDATE',
+          blNo: payload.blNo || previous.blNo || '—',
+          cctRefNo: payload.cctRefNo || previous.cctRefNo || previous.id || '—',
+          dealerName: payload.dealerName || previous.dealerName || '—',
+          lotNo: payload.lotNo || previous.lotNo || '—',
+          staffName,
+          staffRole,
+          dateAdded: previous.createdAt ? previous.createdAt.substring(0, 10) : (previous.dischargeDate || '—'),
+          timesModified: modCount,
+          summary: `Updated ${diff.length} field(s): ${diff.map(d => d.label).join(', ')}`,
+          changes: diff,
+          snapshot: payload
+        });
+      }
+    }
+
     const updated = await persistShipment(payload, shipments, activeCompanyId);
     setShipments(updated);
     setSyncStatus({ pending: true });
@@ -303,15 +360,34 @@ export function App() {
     }
   };
 
-  const handleUpdateShipmentAttachments = async (shipmentId, newBlDocuments) => {
-    const current = shipments.find(s => s.id === shipmentId) || dossierShipment;
-    if (!current) return;
-    const updatedShipment = {
-      ...current,
-      blDocuments: newBlDocuments,
-      updatedAt: new Date().toISOString(),
-      updatedBy: session?.displayName || session?.username || 'User'
-    };
+  const handleUpdateShipmentAttachments = async (arg1, arg2) => {
+    let updatedShipment;
+    const staffName = session?.displayName || session?.username || 'Staff User';
+
+    if (arg1 && typeof arg1 === 'object' && arg1.id) {
+      // Full shipment object passed directly
+      const current = shipments.find(s => s.id === arg1.id) || dossierShipment || arg1;
+      const modCount = (current.timesModified || 0) + 1;
+      updatedShipment = {
+        ...arg1,
+        timesModified: modCount,
+        updatedAt: new Date().toISOString(),
+        updatedBy: staffName
+      };
+    } else {
+      // (shipmentId, newBlDocuments) passed
+      const shipmentId = arg1;
+      const newBlDocuments = arg2;
+      const current = shipments.find(s => s.id === shipmentId) || dossierShipment;
+      if (!current) return;
+      updatedShipment = {
+        ...current,
+        blDocuments: newBlDocuments,
+        updatedAt: new Date().toISOString(),
+        updatedBy: staffName
+      };
+    }
+
     const newList = await persistShipment(updatedShipment, shipments, activeCompanyId);
     setShipments(newList);
     setSyncStatus({ pending: true });
@@ -319,15 +395,39 @@ export function App() {
     return updatedShipment;
   };
 
-  const handleDeleteShipment = async (id) => {
-    if (!requestActionPassword('permanently delete this Bill of Lading (BL) shipment')) return;
-    if (window.confirm('⚠️ Are you sure you want to delete this Bill of Lading shipment record? This action cannot be undone.')) {
-      const updated = await removeShipment(id, shipments, activeCompanyId);
-      setShipments(updated);
-      setSyncStatus({ pending: true });
-      if (dossierShipment && dossierShipment.id === id) {
-        setIsDossierOpen(false);
-      }
+  const handleDeleteShipment = async (id, skipSecurityPrompt = false) => {
+    if (!skipSecurityPrompt) {
+      if (!requestActionPassword('permanently delete this Bill of Lading (BL) shipment')) return;
+      if (!window.confirm('⚠️ Are you sure you want to delete this Bill of Lading shipment record? This action cannot be undone.')) return;
+    }
+
+    const target = shipments.find(s => s.id === id);
+    const staffName = session?.displayName || session?.username || 'Staff User';
+    const staffRole = session?.role || 'Customs Clearance Specialist';
+
+    // 3. DELETE CRUD ACTION: permanently logged
+    if (target) {
+      await recordLogEntry(activeCompanyId, {
+        action: 'DELETE',
+        blNo: target.blNo || '—',
+        cctRefNo: target.cctRefNo || target.id || '—',
+        dealerName: target.dealerName || '—',
+        lotNo: target.lotNo || '—',
+        staffName,
+        staffRole,
+        dateAdded: target.createdAt ? target.createdAt.substring(0, 10) : (target.dischargeDate || '—'),
+        timesModified: target.timesModified || 0,
+        summary: `BL Consignment voucher permanently removed via Slide-to-Delete (Authorized with password 'abcd')`,
+        changes: [],
+        snapshot: target
+      });
+    }
+
+    const updated = await removeShipment(id, shipments, activeCompanyId);
+    setShipments(updated);
+    setSyncStatus({ pending: true });
+    if (dossierShipment && dossierShipment.id === id) {
+      setIsDossierOpen(false);
     }
   };
 
@@ -368,10 +468,15 @@ export function App() {
     const current = shipments.find(s => s.id === statusPrompt.shipment.id) || statusPrompt.shipment;
     const logEntry = buildStatusLogEntry({ status: newStatus, answers, session, containerNo: containerNo || null });
 
+    const staffName = session?.displayName || session?.username || 'Staff User';
+    const staffRole = session?.role || 'Customs Clearance Specialist';
+    const modCount = (current.timesModified || 0) + 1;
+
     let updatedShipment = {
       ...current,
       updatedAt: logEntry.at,
       updatedBy: logEntry.by,
+      timesModified: modCount,
       statusHistory: [...(current.statusHistory || []), logEntry]
     };
 
@@ -403,6 +508,24 @@ export function App() {
     } else {
       updatedShipment = { ...updatedShipment, customsStatus: newStatus };
     }
+
+    // Record Status Progression in permanent audit log
+    await recordLogEntry(activeCompanyId, {
+      action: 'UPDATE',
+      blNo: current.blNo || '—',
+      cctRefNo: current.cctRefNo || current.id || '—',
+      dealerName: current.dealerName || '—',
+      lotNo: current.lotNo || '—',
+      staffName,
+      staffRole,
+      dateAdded: current.createdAt ? current.createdAt.substring(0, 10) : (current.dischargeDate || '—'),
+      timesModified: modCount,
+      summary: `Customs Status progressed to "${newStatus}"`,
+      changes: [
+        { field: 'customsStatus', label: 'Customs Status', oldVal: current.customsStatus || '—', newVal: newStatus }
+      ],
+      snapshot: updatedShipment
+    });
 
     const newList = await persistShipment(updatedShipment, shipments, activeCompanyId);
     setShipments(newList);
@@ -461,7 +584,16 @@ export function App() {
       />
 
       {/* 2. Main Views */}
-      <main className={(currentView === 'bl-master' || currentView === 'work-later') ? 'flex-1 min-h-0 flex flex-col' : 'flex-1 pb-16'}>
+      <main className={(currentView === 'bl-master' || currentView === 'work-later' || currentView === 'log-history') ? 'flex-1 min-h-0 flex flex-col' : 'flex-1 pb-16'}>
+        {currentView === 'log-history' && (
+          <ErrorBoundary>
+            <LogHistoryView
+              companyId={activeCompanyId}
+              onBackToAbcTracker={() => setCurrentView('bl-master')}
+            />
+          </ErrorBoundary>
+        )}
+
         {currentView === 'work-later' && (
           <ErrorBoundary>
             <WorkLaterView
@@ -498,6 +630,7 @@ export function App() {
               searchQuery={searchQuery}
               onViewDossier={handleViewDossier}
               onEditShipment={handleEditShipment}
+              onDeleteShipment={handleDeleteShipment}
             />
           </ErrorBoundary>
         )}

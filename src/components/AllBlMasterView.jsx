@@ -1,25 +1,26 @@
-import React, { useMemo } from 'react';
-import { Briefcase, CheckCircle2 } from 'lucide-react';
-import { COMPLETED_STATUS, getStepsRemaining, TOTAL_STATUS_STAGES } from '../utils/statusStages';
+import React, { useMemo, useState, useEffect } from 'react';
+import { 
+  Briefcase, 
+  CheckCircle2, 
+  ChevronLeft, 
+  ChevronRight, 
+  ChevronsLeft, 
+  ChevronsRight
+} from 'lucide-react';
+import { SwipeableRow } from './SwipeableRow';
+import { COMPLETED_STATUS, getStepsRemaining } from '../utils/statusStages';
 
 export const AllBlMasterView = ({ 
   shipments = [], 
   searchQuery = '',
   onViewDossier, 
-  onEditShipment 
+  onEditShipment,
+  onDeleteShipment 
 }) => {
-  const handleRowClick = (e, s) => {
-    // If user is selecting text, avoid accidental drawer opening
-    const selection = window.getSelection();
-    if (selection && selection.toString().trim().length > 0) {
-      return;
-    }
-    if (onViewDossier) {
-      onViewDossier(s);
-    } else if (onEditShipment) {
-      onEditShipment(s);
-    }
-  };
+  // Client-Side Pagination: strictly 50 BL consignments per page
+  const PAGE_SIZE = 50;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [activeOpenRowId, setActiveOpenRowId] = useState(null);
 
   // Filter across all fields
   const filteredShipments = useMemo(() => {
@@ -50,6 +51,25 @@ export const AllBlMasterView = ({
     });
   }, [shipments, searchQuery]);
 
+  // Reset to page 1 whenever search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setActiveOpenRowId(null);
+  }, [searchQuery]);
+
+  // Pagination bounds calculation
+  const totalItems = filteredShipments.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems);
+  const paginatedShipments = filteredShipments.slice(startIndex, endIndex);
+
+  // BLs still moving through the 9 stages
+  const inFieldCount = useMemo(
+    () => filteredShipments.filter((s) => s.customsStatus !== COMPLETED_STATUS).length,
+    [filteredShipments]
+  );
+
   const thStyle = {
     position: 'sticky',
     top: 0,
@@ -60,48 +80,15 @@ export const AllBlMasterView = ({
     boxShadow: 'inset 0 -2px 0 #1e293b'
   };
 
-  // BLs still moving through the 9 stages = every BL minus the ones already returned
-  const inFieldCount = useMemo(
-    () => filteredShipments.filter((s) => s.customsStatus !== COMPLETED_STATUS).length,
-    [filteredShipments]
-  );
-
   return (
-    <div style={{
-      background: '#070c18',
-      color: '#f8fafc',
-      flex: 1,
-      minHeight: 0,
-      width: '100%',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
-      {/* Table fills the remaining height and scrolls internally */}
-      <div 
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflow: 'auto',
-          background: '#090e1c'
-        }}
-      >
-        <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          textAlign: 'left',
-          fontSize: '0.78rem'
-        }}>
-          {/* Table Header */}
+    <div className="flex-1 min-h-0 w-full flex flex-col bg-[#070c18] text-slate-100">
+      {/* Main Table Scroll Container */}
+      <div className="flex-1 min-h-0 overflow-auto bg-[#090e1c]">
+        <table className="w-full text-left text-[0.78rem]" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+          {/* Table Header: Pure clean column titles */}
           <thead>
-            <tr style={{
-              background: '#0d172c',
-              color: '#94a3b8',
-              fontSize: '0.68rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
-            }}>
-              <th style={{ ...thStyle, width: '32px' }}>#</th>
+            <tr className="bg-[#0d172c] text-slate-400 text-[0.68rem] font-extrabold uppercase tracking-wider">
+              <th style={{ ...thStyle, width: '40px', textAlign: 'center' }}>#</th>
               <th style={{ ...thStyle, minWidth: '125px' }}>CCT REF NO.</th>
               <th style={{ ...thStyle, minWidth: '134px' }}>BL NUMBER</th>
               <th style={{ ...thStyle, minWidth: '150px' }}>DEALER NAME</th>
@@ -129,29 +116,26 @@ export const AllBlMasterView = ({
             </tr>
           </thead>
 
-          {/* Table Body */}
+          {/* Table Body with Gesture-Based Swipeable Rows */}
           <tbody>
-            {filteredShipments.length === 0 ? (
+            {paginatedShipments.length === 0 ? (
               <tr>
-                <td colSpan="14" style={{ padding: '3.5rem', textAlign: 'center', color: '#64748b' }}>
+                <td colSpan="14" className="py-16 text-center text-slate-500 font-medium">
                   No BL consignments found matching "{searchQuery}".
                 </td>
               </tr>
             ) : (
-              filteredShipments.map((s, idx) => {
+              paginatedShipments.map((s, idx) => {
+                const globalIndex = startIndex + idx + 1;
                 const containerNumbers = (s.containers || [])
                   .map(c => c.containerNumber || c.containerNo)
                   .filter(Boolean);
-
-                // The list shows only how many units the BL carries; the numbers
-                // stay available in the tooltip and in the dossier
                 const containerCount = (s.containers || []).length || containerNumbers.length;
 
                 const vesselDisplay = s.vessel 
                   ? `${s.vessel} ${s.voyage || ''}`.trim() 
                   : (s.shippingLine || '—');
 
-                // Determine display status and color style
                 const rawStatus = s.customsStatus || 'Active';
                 const isCleared = rawStatus === 'Customs Cleared' || rawStatus === 'Delivered' || rawStatus === 'Empties Returned';
                 const isDelivered = rawStatus === 'Delivery Taken' || rawStatus === 'Gate Out';
@@ -177,117 +161,88 @@ export const AllBlMasterView = ({
                 }
 
                 const netWeightDisplay = s.netWeight || s.grossWeightKg || s.totalPackages || '—';
-
                 const progress = getStepsRemaining(rawStatus);
                 const polDisplay = s.pol || '—';
                 const etaDisplay = s.eta || s.ata || '—';
                 const dateAddedDisplay = (s.createdAt ? s.createdAt.substring(0, 10) : '') || s.dischargeDate || '—';
 
                 return (
-                  <tr 
+                  <SwipeableRow
                     key={s.id || s.blNo || idx}
-                    onClick={(e) => handleRowClick(e, s)}
-                    style={{
-                      borderBottom: '1px solid #1e293b',
-                      background: idx % 2 === 0 ? '#0b1120' : '#070c18',
-                      cursor: 'pointer',
-                      transition: 'background 120ms'
+                    rowId={s.id}
+                    isOpen={activeOpenRowId === s.id}
+                    onOpenChange={(id) => setActiveOpenRowId(id)}
+                    className={idx % 2 === 0 ? 'bg-[#0b1120]' : 'bg-[#070c18]'}
+                    onClick={() => {
+                      if (onViewDossier) onViewDossier(s);
+                      else if (onEditShipment) onEditShipment(s);
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#111c35'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = idx % 2 === 0 ? '#0b1120' : '#070c18'}
-                    title={`Click to open BL details (${s.blNo || s.cctRefNo || ''})`}
+                    onRemove={() => {
+                      if (onDeleteShipment) {
+                        onDeleteShipment(s.id, true);
+                      }
+                    }}
+                    onEditView={() => {
+                      if (onViewDossier) onViewDossier(s);
+                      else if (onEditShipment) onEditShipment(s);
+                    }}
                   >
-                    {/* 1. Row Index */}
-                    <td style={{ padding: '8px 10px', color: '#64748b', fontWeight: 600 }}>
-                      {idx + 1}
+                    {/* 1. Row Index (# only, clean number) */}
+                    <td className="px-3 py-2 text-slate-500 font-semibold text-center select-none border-b border-slate-800/80">
+                      {globalIndex}
                     </td>
 
-                    {/* 2. CCT REF NO in Mint / Emerald Monospace Chip */}
-                    <td style={{ padding: '8px 10px' }}>
-                      <span style={{ 
-                        color: '#34d399', 
-                        fontWeight: 800, 
-                        fontFamily: 'monospace',
-                        fontSize: '0.76rem',
-                        letterSpacing: '0.03em',
-                        background: 'rgba(16, 185, 129, 0.12)',
-                        padding: '2px 7px',
-                        borderRadius: '5px',
-                        border: '1px solid rgba(16, 185, 129, 0.28)',
-                        display: 'inline-block'
-                      }}>
+                    {/* 2. CCT REF NO */}
+                    <td className="px-3 py-2 border-b border-slate-800/80">
+                      <span className="text-emerald-400 font-extrabold font-mono text-[0.76rem] tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 inline-block">
                         {s.cctRefNo || s.id || 'CCT-PENDING'}
                       </span>
                     </td>
 
-                    {/* 3. BL NUMBER in Gold / Amber */}
-                    <td style={{ padding: '8px 10px' }}>
-                      <span style={{ 
-                        color: '#fbbf24', 
-                        fontWeight: 800, 
-                        fontFamily: 'monospace', 
-                        fontSize: '0.78rem',
-                        letterSpacing: '0.02em',
-                        textDecoration: 'underline',
-                        textDecorationColor: 'rgba(251, 191, 36, 0.4)'
-                      }}>
+                    {/* 3. BL NUMBER */}
+                    <td className="px-3 py-2 border-b border-slate-800/80">
+                      <span className="text-amber-400 font-extrabold font-mono text-[0.78rem] tracking-wide underline decoration-amber-400/40">
                         {s.blNo || 'BL-PENDING'}
                       </span>
                     </td>
 
-                    {/* 4. DEALER NAME in Sky Blue */}
-                    <td style={{ padding: '8px 10px' }}>
+                    {/* 4. DEALER NAME */}
+                    <td className="px-3 py-2 border-b border-slate-800/80">
                       {s.dealerName ? (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <Briefcase size={13} style={{ color: '#38bdf8', flexShrink: 0 }} />
-                          <span style={{ 
-                            color: '#38bdf8', 
-                            fontWeight: 700, 
-                            fontSize: '0.78rem',
-                            letterSpacing: '0.01em'
-                          }}>
+                        <div className="inline-flex items-center gap-1.5">
+                          <Briefcase size={13} className="text-sky-400 shrink-0" />
+                          <span className="text-sky-400 font-bold text-[0.78rem] tracking-tight">
                             {s.dealerName}
                           </span>
                         </div>
                       ) : (
-                        <span style={{ color: '#475569' }}>—</span>
+                        <span className="text-slate-600">—</span>
                       )}
                     </td>
 
-                    {/* 5. LOT NO in Purple Badge */}
-                    <td style={{ padding: '8px 10px' }}>
+                    {/* 5. LOT NO */}
+                    <td className="px-3 py-2 border-b border-slate-800/80">
                       {s.lotNo ? (
-                        <span style={{ 
-                          color: '#c084fc', 
-                          fontFamily: 'monospace', 
-                          fontWeight: 800,
-                          fontSize: '0.75rem',
-                          background: 'rgba(192, 132, 252, 0.12)',
-                          padding: '2px 8px',
-                          borderRadius: '5px',
-                          border: '1px solid rgba(192, 132, 252, 0.3)',
-                          letterSpacing: '0.02em',
-                          display: 'inline-block'
-                        }}>
+                        <span className="text-purple-400 font-mono font-extrabold text-[0.75rem] bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/30 tracking-wide inline-block">
                           {s.lotNo}
                         </span>
                       ) : (
-                        <span style={{ color: '#475569' }}>—</span>
+                        <span className="text-slate-600">—</span>
                       )}
                     </td>
 
                     {/* 6. VESSEL */}
-                    <td style={{ padding: '8px 10px', color: '#cbd5e1', fontWeight: 500 }}>
+                    <td className="px-3 py-2 text-slate-300 font-medium border-b border-slate-800/80">
                       {vesselDisplay}
                     </td>
 
-                    {/* 7. CUSTOMER in Bold White */}
-                    <td style={{ padding: '8px 10px', color: '#ffffff', fontWeight: 800, textTransform: 'uppercase' }}>
+                    {/* 7. CUSTOMER */}
+                    <td className="px-3 py-2 text-white font-extrabold uppercase border-b border-slate-800/80">
                       {s.consignee || '—'}
                     </td>
 
-                    {/* 8. CONTAINER COUNT */}
-                    <td style={{ padding: '8px 10px' }}>
+                    {/* 8. CONTAINERS */}
+                    <td className="px-3 py-2 border-b border-slate-800/80">
                       <span
                         className={'container-count-chip' + (containerCount === 0 ? ' is-empty' : '')}
                         title={containerNumbers.length > 0 ? containerNumbers.join(', ') : 'No containers recorded'}
@@ -298,46 +253,48 @@ export const AllBlMasterView = ({
                     </td>
 
                     {/* 9. NET WEIGHT */}
-                    <td style={{ padding: '8px 10px', color: '#cbd5e1', fontFamily: 'monospace' }}>
+                    <td className="px-3 py-2 text-slate-300 font-mono border-b border-slate-800/80">
                       {netWeightDisplay}
                     </td>
 
                     {/* 10. PORT OF LOADING */}
-                    <td style={{ padding: '8px 10px', color: '#94a3b8' }}>
+                    <td className="px-3 py-2 text-slate-400 border-b border-slate-800/80">
                       {polDisplay}
                     </td>
 
                     {/* 11. ETA (ARRIVAL) */}
-                    <td style={{ padding: '8px 10px', color: '#94a3b8', fontFamily: 'monospace' }}>
+                    <td className="px-3 py-2 text-slate-400 font-mono border-b border-slate-800/80">
                       {etaDisplay}
                     </td>
 
                     {/* 12. DATE ADDED */}
-                    <td style={{ padding: '8px 10px', color: '#94a3b8', fontFamily: 'monospace' }}>
+                    <td className="px-3 py-2 text-slate-400 font-mono border-b border-slate-800/80">
                       {dateAddedDisplay}
                     </td>
 
                     {/* 13. STATUS */}
-                    <td style={{ padding: '8px 10px' }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800,
-                        letterSpacing: '0.02em',
-                        whiteSpace: 'nowrap',
-                        ...statusBadgeStyle
-                      }}>
+                    <td className="px-3 py-2 border-b border-slate-800/80">
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          letterSpacing: '0.02em',
+                          whiteSpace: 'nowrap',
+                          ...statusBadgeStyle
+                        }}
+                      >
                         {rawStatus}
                       </span>
                     </td>
 
                     {/* 14. STEPS REMAINING */}
-                    <td style={{ padding: '8px 10px' }}>
+                    <td className="px-3 py-2 border-b border-slate-800/80">
                       <div
                         className="steps-cell"
-                        title={`Phase ${progress.completed} of ${progress.total}${progress.nextStage ? ' — next: ' + progress.nextStage.label : ' — End-to-End Customs & Logistics Progression complete'}`}
+                        title={`Phase ${progress.completed} of ${progress.total}${progress.nextStage ? ' — next: ' + progress.nextStage.label : ' — Progression complete'}`}
                       >
                         {progress.isComplete ? (
                           <span className="steps-chip is-done">
@@ -361,7 +318,7 @@ export const AllBlMasterView = ({
                         </span>
                       </div>
                     </td>
-                  </tr>
+                  </SwipeableRow>
                 );
               })
             )}
@@ -369,6 +326,87 @@ export const AllBlMasterView = ({
         </table>
       </div>
 
+      {/* Pagination Control Bar: Exactly 50 BLs per page */}
+      <div className="bg-[#0d172c] border-t border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-3">
+        {/* Left: Professional Count Label */}
+        <div>
+          Showing <span className="text-white font-bold">{totalItems === 0 ? 0 : startIndex + 1}</span>–<span className="text-white font-bold">{endIndex}</span> of <span className="text-white font-extrabold">{totalItems}</span> BL Consignments <span className="text-slate-500 font-medium">(50 BLs per page)</span>
+        </div>
+
+        {/* Right: Pagination Controls */}
+        <div className="flex items-center gap-1.5">
+          <span className="mr-2 text-slate-400 text-xs">
+            Page <strong className="text-sky-400">{currentPage}</strong> of <strong className="text-slate-200">{totalPages}</strong>
+          </span>
+
+          {/* First Page */}
+          <button
+            type="button"
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+            className={`p-1.5 rounded border ${currentPage === 1 ? 'bg-slate-900/60 text-slate-600 border-slate-800 cursor-not-allowed' : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'}`}
+            title="First Page"
+          >
+            <ChevronsLeft size={14} />
+          </button>
+
+          {/* Previous Page */}
+          <button
+            type="button"
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold border ${currentPage === 1 ? 'bg-slate-900/60 text-slate-600 border-slate-800 cursor-not-allowed' : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'}`}
+          >
+            <ChevronLeft size={14} />
+            <span>Prev</span>
+          </button>
+
+          {/* Page Number Chips */}
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+            .map((p, idx, arr) => {
+              const prev = arr[idx - 1];
+              return (
+                <React.Fragment key={p}>
+                  {prev && p - prev > 1 && (
+                    <span className="text-slate-600 px-1 text-xs">...</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(p)}
+                    className={`px-2.5 py-1 rounded text-xs font-bold border transition-colors ${currentPage === p ? 'bg-sky-600 text-white border-sky-400 shadow-sm' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white'}`}
+                  >
+                    {p}
+                  </button>
+                </React.Fragment>
+              );
+            })}
+
+          {/* Next Page */}
+          <button
+            type="button"
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold border ${currentPage === totalPages ? 'bg-slate-900/60 text-slate-600 border-slate-800 cursor-not-allowed' : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'}`}
+          >
+            <span>Next</span>
+            <ChevronRight size={14} />
+          </button>
+
+          {/* Last Page */}
+          <button
+            type="button"
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage === totalPages}
+            className={`p-1.5 rounded border ${currentPage === totalPages ? 'bg-slate-900/60 text-slate-600 border-slate-800 cursor-not-allowed' : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'}`}
+            title="Last Page"
+          >
+            <ChevronsRight size={14} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
+
+export default AllBlMasterView;

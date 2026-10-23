@@ -18,7 +18,8 @@ import {
   Table,
   Lock,
   KeyRound,
-  X
+  X,
+  History
 } from 'lucide-react';
 import { requestMaintenanceAccess } from '../utils/securityGate';
 import {
@@ -154,6 +155,30 @@ export const Navbar = ({
                   <div>
                     <div className="menu-item-title" style={{ color: currentView === 'bl-master' ? '#fbbf24' : '#f8fafc' }}>All BL Consignments Directory</div>
                     <div className="menu-item-sub">All active & cleared BL records in 1 list</div>
+                  </div>
+                </button>
+
+                {/* Log History Button */}
+                <button
+                  id="btn-menu-log-history"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setCurrentView('log-history');
+                  }}
+                  className={`menu-item-action ${currentView === 'log-history' ? 'menu-item-highlight' : ''}`}
+                  style={currentView === 'log-history' ? { background: 'linear-gradient(to right, rgba(56, 189, 248, 0.18), transparent)' } : {}}
+                >
+                  <div className="menu-icon-square" style={{ background: currentView === 'log-history' ? '#0284c7' : '#1e293b', color: currentView === 'log-history' ? '#ffffff' : '#38bdf8' }}>
+                    <History size={17} />
+                  </div>
+                  <div>
+                    <div className="menu-item-title" style={{ color: currentView === 'log-history' ? '#38bdf8' : '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Log History</span>
+                      <span style={{ fontSize: '0.6rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(56, 189, 248, 0.3)', fontWeight: 800 }}>
+                        AUDIT
+                      </span>
+                    </div>
+                    <div className="menu-item-sub">Permanent trail of every CRUD action & staff name</div>
                   </div>
                 </button>
 
@@ -296,18 +321,21 @@ export const Navbar = ({
           <div style={{ width: '1px', height: '20px', background: 'rgba(255, 255, 255, 0.15)', margin: '0 4px', flexShrink: 0 }} />
 
           <div 
+            onClick={() => setCurrentView(currentView === 'log-history' ? 'bl-master' : 'log-history')}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               padding: '2px 8px',
-              background: 'rgba(56, 189, 248, 0.08)',
-              border: '1px solid rgba(56, 189, 248, 0.25)',
+              background: currentView === 'log-history' ? 'rgba(56, 189, 248, 0.22)' : 'rgba(56, 189, 248, 0.08)',
+              border: currentView === 'log-history' ? '1px solid rgba(56, 189, 248, 0.6)' : '1px solid rgba(56, 189, 248, 0.25)',
               borderRadius: '6px',
               whiteSpace: 'nowrap',
-              flexShrink: 0
+              flexShrink: 0,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
-            title="ABC Tracking Consolidated BL Master"
+            title={currentView === 'log-history' ? 'Click to return to ABC Tracking' : 'ABC Tracking Consolidated BL Master (Click to view Log History)'}
           >
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 6px #38bdf8' }} />
             <span style={{
@@ -317,7 +345,7 @@ export const Navbar = ({
               color: '#f8fafc',
               textTransform: 'uppercase'
             }}>
-              ABC TRACKING
+              {currentView === 'log-history' ? 'LOG HISTORY' : 'ABC TRACKING'}
             </span>
           </div>
         </div>
